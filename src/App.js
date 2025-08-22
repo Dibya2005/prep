@@ -1,5 +1,5 @@
 // App.js
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react"; // Added useCallback
 import {
   BrowserRouter as Router,
   Routes,
@@ -117,7 +117,6 @@ const ADMIN_SEED_EMAILS = ["nilamroychoudhury216@gmail.com"]; // replace with yo
 /* ============================
   AdSense placeholder (dummy)
   ============================ */
-// FIX: Removed unused 'ADSENSE_PUB' constant
 function AdPlaceholder({ label = "Ad" }) {
   return (
     <div
@@ -1253,13 +1252,51 @@ function AttemptPage({ user }) {
   const [loading, setLoading] = useState(true);
   const [startedAt, setStartedAt] = useState(null);
   const [secondsLeft, setSecondsLeft] = useState(0);
-  const [answers, setAnswers] = useState(null); // array or object: {sectionIndex: [answers]}
+  const [answers, setAnswers] = useState(null);
   const [current, setCurrent] = useState({ section: 0, idx: 0 });
   const [marked, setMarked] = useState({});
   const [saving, setSaving] = useState(false);
   const timerRef = useRef(null);
 
   const LS_KEY = `attempt_${id}`;
+
+  const submitAttempt = useCallback(
+    async (auto = false) => {
+      if (!test || !user) return;
+      setSaving(true);
+      try {
+        const res = calculateResults(test, answers);
+        const payload = {
+          userId: user.uid,
+          username: user.displayName || user.email,
+          mockTestId: test.id,
+          hasSections: test.hasSections || false,
+          sectionScores: res.sectionScores || [],
+          totalScore: res.totalScore,
+          totalMarks: res.totalMarks,
+          totalQuestions: res.totalQuestions,
+          answers,
+          startedAt: serverTimestamp(),
+          submittedAt: serverTimestamp(),
+          timeTakenSec: test.duration * 60 - secondsLeft,
+          auto: !!auto,
+        };
+        const refDoc = await addDoc(collection(db, "attempts"), payload);
+        localStorage.removeItem(LS_KEY);
+        navigate(`/tests/${test.id}/review/${refDoc.id}`);
+      } catch (e) {
+        console.error(e);
+        alert("Failed to submit attempt.");
+      } finally {
+        setSaving(false);
+      }
+    },
+    [answers, LS_KEY, navigate, secondsLeft, test, user]
+  );
+
+  const autoSubmit = useCallback(async () => {
+    await submitAttempt(true);
+  }, [submitAttempt]);
 
   useEffect(() => {
     (async () => {
@@ -1273,7 +1310,6 @@ function AttemptPage({ user }) {
       setTest(t);
       setLoading(false);
 
-      // load from localStorage
       const raw = localStorage.getItem(LS_KEY);
       if (raw) {
         try {
@@ -1287,8 +1323,7 @@ function AttemptPage({ user }) {
             const left = Math.max(0, t.duration * 60 - elapsed);
             setSecondsLeft(left);
             if (left === 0) {
-              // auto-submit saved answers
-              await autoSubmit(parsed.answers, t);
+              await autoSubmit();
             }
             return;
           }
@@ -1297,7 +1332,6 @@ function AttemptPage({ user }) {
         }
       }
 
-      // fresh start
       const now = Date.now();
       setStartedAt(now);
       if (!t.hasSections) {
@@ -1323,12 +1357,12 @@ function AttemptPage({ user }) {
         })
       );
     })();
-    // FIX: Added missing dependency 'LS_KEY'
-  }, [id, LS_KEY]);
+  }, [id, LS_KEY, autoSubmit]);
 
-  // start countdown
+  const handleAutoSubmit = useCallback(() => submitAttempt(true), [submitAttempt]);
+
   useEffect(() => {
-    if (!secondsLeft || secondsLeft <= 0) return;
+    if (secondsLeft === null || secondsLeft <= 0) return;
     timerRef.current = setInterval(() => {
       setSecondsLeft((s) => {
         if (s <= 1) {
@@ -1340,10 +1374,8 @@ function AttemptPage({ user }) {
       });
     }, 1000);
     return () => clearInterval(timerRef.current);
-    // eslint-disable-next-line
-  }, [secondsLeft]);
+  }, [secondsLeft, handleAutoSubmit]);
 
-  // autosave every 8 seconds
   useEffect(() => {
     const iv = setInterval(() => {
       if (!test) return;
@@ -1354,11 +1386,6 @@ function AttemptPage({ user }) {
     }, 8000);
     return () => clearInterval(iv);
   }, [answers, current, marked, test, startedAt, id, LS_KEY]);
-
-  const autoSubmit = async (savedAnswers, t) => {
-    // called when time exhausted on load
-    await submitAttempt(true);
-  };
 
   if (loading)
     return (
@@ -1406,48 +1433,14 @@ function AttemptPage({ user }) {
     setMarked(copy);
   };
 
-  // FIX: Removed unused 'goto' function
   const confirmSubmit = () => {
     if (!window.confirm("Submit test now?")) return;
     submitAttempt(false);
   };
 
-  const handleAutoSubmit = () => submitAttempt(true);
-
-  const submitAttempt = async (auto = false) => {
-    setSaving(true);
-    try {
-      const res = calculateResults(test, answers);
-      const payload = {
-        userId: user.uid,
-        username: user.displayName || user.email,
-        mockTestId: test.id,
-        hasSections: test.hasSections || false,
-        sectionScores: res.sectionScores || [],
-        totalScore: res.totalScore,
-        totalMarks: res.totalMarks,
-        totalQuestions: res.totalQuestions,
-        answers,
-        startedAt: serverTimestamp(),
-        submittedAt: serverTimestamp(),
-        timeTakenSec: test.duration * 60 - secondsLeft,
-        auto: !!auto,
-      };
-      const refDoc = await addDoc(collection(db, "attempts"), payload);
-      localStorage.removeItem(LS_KEY);
-      navigate(`/tests/${test.id}/review/${refDoc.id}`);
-    } catch (e) {
-      console.error(e);
-      alert("Failed to submit attempt.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const minutes = Math.floor(secondsLeft / 60);
   const secs = secondsLeft % 60;
 
-  // navigator UI
   const Navigator = () => {
     if (!isSectional) {
       return (
@@ -1513,13 +1506,13 @@ function AttemptPage({ user }) {
                       borderColor:
                         current.section === si && current.idx === qi
                           ? "#0f172a"
-                          : answers[si] && answers[si][qi] !== null
+                          : answers?.[si]?.[qi] !== null
                           ? "#16a34a"
                           : "#e5e7eb",
                       background:
                         current.section === si && current.idx === qi
                           ? "#f3f4f6"
-                          : answers[si] && answers[si][qi] !== null
+                          : answers?.[si]?.[qi] !== null
                           ? "#eaffea"
                           : "#fff",
                     }}
@@ -1669,7 +1662,6 @@ function AttemptPage({ user }) {
                 <button
                   style={btn}
                   onClick={() => {
-                    // go to next section first unanswered
                     let moved = false;
                     for (
                       let s = current.section + 1;
@@ -1775,7 +1767,6 @@ function AttemptPage({ user }) {
         </div>
       </div>
 
-      {/* Bottom fixed actions for mobile */}
       <div
         style={{
           position: "fixed",
@@ -1846,23 +1837,8 @@ function ReviewPage() {
 
   const userAnswers = attempt.answers || (test.hasSections ? {} : []);
   const res = calculateResults(test, userAnswers);
-  const correct = (() => {
-    let c = 0;
-    if (!test.hasSections) {
-      (test.questions || []).forEach((q, i) => {
-        if (userAnswers[i] === q.ans) c++;
-      });
-    } else {
-      (test.sections || []).forEach((s, si) => {
-        (s.questions || []).forEach((q, qi) => {
-          if (userAnswers[si] && userAnswers[si][qi] === q.ans) c++;
-        });
-      });
-    }
-    return c;
-  })();
-  // FIX: Removed unused 'wrong' variable
-  // pie data
+
+  // FIX: Removed unused 'correct' variable
   let corr = 0,
     wr = 0,
     sk = 0;
@@ -1963,7 +1939,6 @@ function ReviewPage() {
 
           <div style={card}>
             <h4 style={{ marginTop: 0 }}>Detailed Solutions</h4>
-            {/* Render questions with solutions */}
             {!test.hasSections
               ? (test.questions || []).map((q, i) => {
                   const ua = (userAnswers || [])[i];
