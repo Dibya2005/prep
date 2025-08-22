@@ -117,7 +117,7 @@ const ADMIN_SEED_EMAILS = ["nilamroychoudhury216@gmail.com"]; // replace with yo
 /* ============================
   AdSense placeholder (dummy)
   ============================ */
-const ADSENSE_PUB = "ca-pub-0000000000000000"; // dummy pub id
+// FIX: Removed unused 'ADSENSE_PUB' constant
 function AdPlaceholder({ label = "Ad" }) {
   return (
     <div
@@ -328,7 +328,6 @@ function Section({ title, actions, children }) {
   ADMIN PANEL (tests, jobs, notes)
   ============================ */
 function AdminPanel({ userDoc }) {
-  // FIX: Moved useState to the top of the component
   const [tab, setTab] = useState("tests");
 
   if (!userDoc) return <Navigate to="/" replace />;
@@ -1324,8 +1323,8 @@ function AttemptPage({ user }) {
         })
       );
     })();
-    // eslint-disable-next-line
-  }, [id]);
+    // FIX: Added missing dependency 'LS_KEY'
+  }, [id, LS_KEY]);
 
   // start countdown
   useEffect(() => {
@@ -1354,7 +1353,7 @@ function AttemptPage({ user }) {
       );
     }, 8000);
     return () => clearInterval(iv);
-  }, [answers, current, marked, test, startedAt, id]);
+  }, [answers, current, marked, test, startedAt, id, LS_KEY]);
 
   const autoSubmit = async (savedAnswers, t) => {
     // called when time exhausted on load
@@ -1407,8 +1406,7 @@ function AttemptPage({ user }) {
     setMarked(copy);
   };
 
-  const goto = (si, qi) => setCurrent({ section: si, idx: qi });
-
+  // FIX: Removed unused 'goto' function
   const confirmSubmit = () => {
     if (!window.confirm("Submit test now?")) return;
     submitAttempt(false);
@@ -1454,7 +1452,7 @@ function AttemptPage({ user }) {
     if (!isSectional) {
       return (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-          {answers.map((a, i) => (
+          {(answers || []).map((a, i) => (
             <button
               key={i}
               onClick={() => setCurrent({ section: 0, idx: i })}
@@ -1484,7 +1482,7 @@ function AttemptPage({ user }) {
     } else {
       return (
         <div>
-          {test.sections.map((s, si) => (
+          {(test.sections || []).map((s, si) => (
             <div key={si} style={{ marginBottom: 8 }}>
               <div
                 style={{
@@ -1863,11 +1861,7 @@ function ReviewPage() {
     }
     return c;
   })();
-  const wrong =
-    (res.totalQuestions || 0) -
-    correct -
-    (res.totalQuestions - res.totalQuestions);
-
+  // FIX: Removed unused 'wrong' variable
   // pie data
   let corr = 0,
     wr = 0,
@@ -1941,23 +1935,25 @@ function ReviewPage() {
               </ResponsiveContainer>
             </div>
 
-            <div style={{ height: 240, marginTop: 8 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={
-                    attempt.sectionScores && attempt.sectionScores.length
-                      ? attempt.sectionScores
-                      : res.sectionScores
-                  }
-                >
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="score" fill="#2563eb" />
-                  <Bar dataKey="marks" fill="#16a34a" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            {res.sectionScores.length > 0 && (
+              <div style={{ height: 240, marginTop: 8 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={
+                      attempt.sectionScores && attempt.sectionScores.length
+                        ? attempt.sectionScores
+                        : res.sectionScores
+                    }
+                  >
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="score" fill="#2563eb" />
+                    <Bar dataKey="marks" fill="#16a34a" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
           </div>
 
           <div style={card}>
@@ -2364,10 +2360,8 @@ function Notes() {
   DASHBOARD (attempt history)
   ============================ */
 function Dashboard({ user }) {
-  // FIX: Moved hooks to the top of the component
   const [attempts, setAttempts] = useState([]);
   useEffect(() => {
-    // FIX: Check if user exists before querying
     if (!user) {
       setAttempts([]);
       return;
@@ -2381,7 +2375,7 @@ function Dashboard({ user }) {
       setAttempts(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
     return unsub;
-  }, [user]); // FIX: Dependency array updated to just user
+  }, [user]);
 
   if (!user) return <Navigate to="/" replace />;
 
