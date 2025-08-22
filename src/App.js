@@ -328,6 +328,9 @@ function Section({ title, actions, children }) {
   ADMIN PANEL (tests, jobs, notes)
   ============================ */
 function AdminPanel({ userDoc }) {
+  // FIX: Moved useState to the top of the component
+  const [tab, setTab] = useState("tests");
+
   if (!userDoc) return <Navigate to="/" replace />;
   if (userDoc.role !== "admin") {
     return (
@@ -340,7 +343,6 @@ function AdminPanel({ userDoc }) {
     );
   }
 
-  const [tab, setTab] = useState("tests");
   return (
     <Section
       title="Admin Panel"
@@ -2362,9 +2364,14 @@ function Notes() {
   DASHBOARD (attempt history)
   ============================ */
 function Dashboard({ user }) {
-  if (!user) return <Navigate to="/" replace />;
+  // FIX: Moved hooks to the top of the component
   const [attempts, setAttempts] = useState([]);
   useEffect(() => {
+    // FIX: Check if user exists before querying
+    if (!user) {
+      setAttempts([]);
+      return;
+    }
     const q = query(
       collection(db, "attempts"),
       where("userId", "==", user.uid),
@@ -2374,7 +2381,9 @@ function Dashboard({ user }) {
       setAttempts(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
     return unsub;
-  }, [user.uid]);
+  }, [user]); // FIX: Dependency array updated to just user
+
+  if (!user) return <Navigate to="/" replace />;
 
   return (
     <Section title="My Dashboard">
