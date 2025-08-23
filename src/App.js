@@ -1,5 +1,5 @@
 // App.js
-import React, { useCallback, useEffect, useRef, useState } from "react"; // Added useCallback
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -50,8 +50,8 @@ import {
 } from "recharts";
 
 /* ============================
-  Firebase config — keep yours
-  ============================ */
+  Firebase config — keep yours
+  ============================ */
 const firebaseConfig = {
   apiKey: "AIzaSyCQJ3dX_ZcxVKzlCD8H19JM3KYh7qf8wYk",
   authDomain: "form-ca7cc.firebaseapp.com",
@@ -67,8 +67,8 @@ const storage = getStorage(app);
 const provider = new GoogleAuthProvider();
 
 /* ============================
-  Small mobile-first styles
-  ============================ */
+  Small mobile-first styles
+  ============================ */
 const mobileWrap = {
   maxWidth: 980,
   margin: "0 auto",
@@ -110,13 +110,13 @@ const input = {
 const smallMuted = { fontSize: 12, color: "#6b7280" };
 
 /* ============================
-  Admin seed emails
-  ============================ */
+  Admin seed emails
+  ============================ */
 const ADMIN_SEED_EMAILS = ["nilamroychoudhury216@gmail.com"]; // replace with your admin email(s)
 
 /* ============================
-  AdSense placeholder (dummy)
-  ============================ */
+  AdSense placeholder (dummy)
+  ============================ */
 function AdPlaceholder({ label = "Ad" }) {
   return (
     <div
@@ -135,8 +135,8 @@ function AdPlaceholder({ label = "Ad" }) {
 }
 
 /* ============================
-  Auth Hook: user + userDoc
-  ============================ */
+  Auth Hook: user + userDoc
+  ============================ */
 function useAuthUser() {
   const [user, setUser] = useState(null);
   const [userDoc, setUserDoc] = useState(null);
@@ -174,10 +174,10 @@ function useAuthUser() {
 }
 
 /* ============================
-  Single calculateResults function
-  Handles both sectional and non-sectional
-  Returns totals and sectionScores array
-  ============================ */
+  Single calculateResults function
+  Handles both sectional and non-sectional
+  Returns totals and sectionScores array
+  ============================ */
 function calculateResults(test, answers) {
   const hasSections = !!test?.hasSections;
   let totalScore = 0;
@@ -223,8 +223,8 @@ function calculateResults(test, answers) {
 }
 
 /* ============================
-  NAVBAR
-  ============================ */
+  NAVBAR
+  ============================ */
 function Navbar({ userDoc }) {
   const navigate = useNavigate();
   const login = async () => {
@@ -255,7 +255,7 @@ function Navbar({ userDoc }) {
         }}
       >
         <Link to="/" style={{ textDecoration: "none", color: "#0f172a" }}>
-          <strong style={{ fontSize: 18 }}>SBI Prep • EduHub</strong>
+          <strong style={{ fontSize: 18 }}>Prepji</strong>
         </Link>
         <div
           style={{
@@ -298,11 +298,11 @@ function Navbar({ userDoc }) {
 }
 
 /* ============================
-  SECTION wrapper component
-  ============================ */
+  SECTION wrapper component
+  ============================ */
 function Section({ title, actions, children }) {
   useEffect(() => {
-    if (title) document.title = `${title} — SBI Prep`;
+    if (title) document.title = `${title} — Prepji`;
   }, [title]);
 
   return (
@@ -324,8 +324,8 @@ function Section({ title, actions, children }) {
 }
 
 /* ============================
-  ADMIN PANEL (tests, jobs, notes)
-  ============================ */
+  ADMIN PANEL (tests, jobs, notes)
+  ============================ */
 function AdminPanel({ userDoc }) {
   const [tab, setTab] = useState("tests");
 
@@ -375,8 +375,8 @@ function AdminPanel({ userDoc }) {
 }
 
 /* ============================
-  ADMIN: Tests (sectional & non-sectional)
-  ============================ */
+  ADMIN: Tests (sectional & non-sectional)
+  ============================ */
 function AdminTests() {
   const initial = {
     title: "",
@@ -850,8 +850,8 @@ function AdminTests() {
 }
 
 /* ============================
-  ADMIN: Jobs
-  ============================ */
+  ADMIN: Jobs
+  ============================ */
 function AdminJobs() {
   const empty = {
     title: "",
@@ -1001,8 +1001,8 @@ function AdminJobs() {
 }
 
 /* ============================
-  ADMIN: Notes (upload)
-  ============================ */
+  ADMIN: Notes (upload)
+  ============================ */
 function AdminNotes() {
   const initial = {
     title: "",
@@ -1183,8 +1183,8 @@ function AdminNotes() {
 }
 
 /* ============================
-  STUDENT: Tests list
-  ============================ */
+  STUDENT: Tests list
+  ============================ */
 function TestsList() {
   const [list, setList] = useState([]);
   useEffect(() => {
@@ -1241,10 +1241,10 @@ function TestsList() {
 }
 
 /* ============================
-  ATTEMPT PAGE
-  dynamic for sectional / non-sectional
-  timer, auto-save, auto-submit, mark, navigator
-  ============================ */
+  ATTEMPT PAGE
+  dynamic for sectional / non-sectional
+  timer, auto-save, auto-submit, mark, navigator
+  ============================ */
 function AttemptPage({ user }) {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -1417,14 +1417,22 @@ function AttemptPage({ user }) {
   };
 
   const selectOption = (o) => {
+    // FIX: Add a guard clause to ensure 'answers' is not null.
+    if (answers === null) return;
+  
     if (!isSectional) {
-      const a = [...answers];
-      a[current.idx] = o;
-      setAnswers(a);
+      const newAnswers = [...answers];
+      newAnswers[current.idx] = o;
+      setAnswers(newAnswers);
     } else {
-      const copy = JSON.parse(JSON.stringify(answers));
-      copy[current.section][current.idx] = o;
-      setAnswers(copy);
+      // FIX: Use a more robust immutable update pattern.
+      setAnswers(prevAnswers => {
+          const newAnswers = { ...prevAnswers };
+          const newSectionAnswers = [...(newAnswers[current.section] || [])];
+          newSectionAnswers[current.idx] = o;
+          newAnswers[current.section] = newSectionAnswers;
+          return newAnswers;
+      });
     }
   };
 
@@ -1801,8 +1809,8 @@ function AttemptPage({ user }) {
 }
 
 /* ============================
-  REVIEW PAGE (solutions, charts, leaderboard)
-  ============================ */
+  REVIEW PAGE (solutions, charts, leaderboard)
+  ============================ */
 function ReviewPage() {
   const { testId, attemptId } = useParams();
   const [attempt, setAttempt] = useState(null);
@@ -1841,7 +1849,6 @@ function ReviewPage() {
   const userAnswers = attempt.answers || (test.hasSections ? {} : []);
   const res = calculateResults(test, userAnswers);
 
-  // FIX: Removed unused 'correct' variable
   let corr = 0,
     wr = 0,
     sk = 0;
@@ -2062,8 +2069,8 @@ function ReviewPage() {
 }
 
 /* ============================
-  LEADERBOARD component
-  ============================ */
+  LEADERBOARD component
+  ============================ */
 function Leaderboard({ testId, showUser }) {
   const [rows, setRows] = useState([]);
   useEffect(() => {
@@ -2110,8 +2117,8 @@ function Leaderboard({ testId, showUser }) {
 }
 
 /* ============================
-  JOBS page
-  ============================ */
+  JOBS page
+  ============================ */
 function Jobs() {
   const [list, setList] = useState([]);
   const [qText, setQText] = useState("");
@@ -2220,8 +2227,8 @@ function Jobs() {
 }
 
 /* ============================
-  NOTES page (preview + download)
-  ============================ */
+  NOTES page (preview + download)
+  ============================ */
 function Notes() {
   const [list, setList] = useState([]);
   const [exam, setExam] = useState("");
@@ -2335,8 +2342,8 @@ function Notes() {
 }
 
 /* ============================
-  DASHBOARD (attempt history)
-  ============================ */
+  DASHBOARD (attempt history)
+  ============================ */
 function Dashboard({ user }) {
   const [attempts, setAttempts] = useState([]);
   useEffect(() => {
@@ -2399,12 +2406,12 @@ function Dashboard({ user }) {
 }
 
 /* ============================
-  HOME
-  ============================ */
+  HOME
+  ============================ */
 function Home() {
   return (
     <Section
-      title="Crack SBI Exams with Structured Mock Tests"
+      title="Crack Exams with Structured Mock Tests"
       actions={
         <Link to="/tests" style={btnGhost}>
           Browse Tests
@@ -2413,9 +2420,8 @@ function Home() {
     >
       <div style={card}>
         <p>
-          Practice full-length and sectional mock tests for SBI PO, Clerk and
-          other exams. Timer, solutions, analytics, leaderboards — mobile
-          friendly.
+          Practice full-length and sectional mock tests for competitive exams.
+          Timer, solutions, analytics, leaderboards — mobile friendly.
         </p>
         <ul>
           <li>Admin can create sectional or flat tests with solutions</li>
@@ -2430,8 +2436,8 @@ function Home() {
 }
 
 /* ============================
-  MAIN APP
-  ============================ */
+  MAIN APP
+  ============================ */
 export default function App() {
   const { user, userDoc } = useAuthUser();
   return (
@@ -2459,7 +2465,7 @@ export default function App() {
           textAlign: "center",
         }}
       >
-        © {new Date().getFullYear()} SBI Prep — EduHub
+        © {new Date().getFullYear()} Prepji
       </footer>
     </Router>
   );
