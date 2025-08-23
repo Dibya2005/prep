@@ -50,8 +50,8 @@ import {
 } from "recharts";
 
 /* ============================
-  Firebase config — keep yours
-  ============================ */
+  Firebase config — keep yours
+  ============================ */
 const firebaseConfig = {
   apiKey: "AIzaSyCQJ3dX_ZcxVKzlCD8H19JM3KYh7qf8wYk",
   authDomain: "form-ca7cc.firebaseapp.com",
@@ -67,8 +67,8 @@ const storage = getStorage(app);
 const provider = new GoogleAuthProvider();
 
 /* ============================
-  Small mobile-first styles
-  ============================ */
+  Small mobile-first styles
+  ============================ */
 const mobileWrap = {
   maxWidth: 980,
   margin: "0 auto",
@@ -110,13 +110,13 @@ const input = {
 const smallMuted = { fontSize: 12, color: "#6b7280" };
 
 /* ============================
-  Admin seed emails
-  ============================ */
+  Admin seed emails
+  ============================ */
 const ADMIN_SEED_EMAILS = ["nilamroychoudhury216@gmail.com"]; // replace with your admin email(s)
 
 /* ============================
-  AdSense placeholder (dummy)
-  ============================ */
+  AdSense placeholder (dummy)
+  ============================ */
 function AdPlaceholder({ label = "Ad" }) {
   return (
     <div
@@ -135,8 +135,8 @@ function AdPlaceholder({ label = "Ad" }) {
 }
 
 /* ============================
-  Auth Hook: user + userDoc
-  ============================ */
+  Auth Hook: user + userDoc
+  ============================ */
 function useAuthUser() {
   const [user, setUser] = useState(null);
   const [userDoc, setUserDoc] = useState(null);
@@ -174,10 +174,10 @@ function useAuthUser() {
 }
 
 /* ============================
-  Single calculateResults function
-  Handles both sectional and non-sectional
-  Returns totals and sectionScores array
-  ============================ */
+  Single calculateResults function
+  Handles both sectional and non-sectional
+  Returns totals and sectionScores array
+  ============================ */
 function calculateResults(test, answers) {
   const hasSections = !!test?.hasSections;
   let totalScore = 0;
@@ -223,17 +223,25 @@ function calculateResults(test, answers) {
 }
 
 /* ============================
-  NAVBAR
-  ============================ */
+  NAVBAR - Mobile Friendly
+  ============================ */
 function Navbar({ userDoc }) {
   const navigate = useNavigate();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
   const login = async () => {
     await signInWithPopup(auth, provider);
     navigate("/");
   };
+
   const logout = async () => {
     await signOut(auth);
     navigate("/");
+    setIsMenuOpen(false);
+  };
+
+  const toggleMenu = () => {
+    setIsMenuOpen(!isMenuOpen);
   };
 
   return (
@@ -252,11 +260,63 @@ function Navbar({ userDoc }) {
           display: "flex",
           alignItems: "center",
           gap: 12,
+          padding: "10px 14px",
         }}
       >
-        <Link to="/" style={{ textDecoration: "none", color: "#0f172a" }}>
-          <strong style={{ fontSize: 18 }}>Prepji</strong>
+        <Link
+          to="/"
+          style={{ textDecoration: "none", color: "#0f172a" }}
+          onClick={() => setIsMenuOpen(false)}
+        >
+          <strong style={{ fontSize: 18 }}>prepji</strong>
         </Link>
+
+        {/* Hamburger menu for mobile */}
+        <button
+          onClick={toggleMenu}
+          style={{
+            ...btnGhost,
+            display: "none",
+            flexDirection: "column",
+            justifyContent: "center",
+            alignItems: "center",
+            width: 40,
+            height: 40,
+            padding: 0,
+            marginLeft: "auto",
+          }}
+          className="mobile-menu-btn"
+        >
+          <span
+            style={{
+              width: 20,
+              height: 2,
+              background: "#0f172a",
+              margin: "2px 0",
+              transition: "0.3s",
+            }}
+          ></span>
+          <span
+            style={{
+              width: 20,
+              height: 2,
+              background: "#0f172a",
+              margin: "2px 0",
+              transition: "0.3s",
+            }}
+          ></span>
+          <span
+            style={{
+              width: 20,
+              height: 2,
+              background: "#0f172a",
+              margin: "2px 0",
+              transition: "0.3s",
+            }}
+          ></span>
+        </button>
+
+        {/* Desktop navigation */}
         <div
           style={{
             marginLeft: "auto",
@@ -264,6 +324,7 @@ function Navbar({ userDoc }) {
             gap: 8,
             alignItems: "center",
           }}
+          className="desktop-nav"
         >
           <Link to="/tests" style={{ ...btnGhost, padding: "8px 10px" }}>
             Tests
@@ -293,16 +354,96 @@ function Navbar({ userDoc }) {
           )}
         </div>
       </div>
+
+      {/* Mobile navigation menu */}
+      {isMenuOpen && (
+        <div
+          style={{
+            background: "#fff",
+            borderTop: "1px solid #e5e7eb",
+            padding: "10px 14px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
+          }}
+          className="mobile-nav"
+        >
+          <Link
+            to="/tests"
+            style={{ ...btnGhost, textAlign: "center" }}
+            onClick={() => setIsMenuOpen(false)}
+          >
+            Tests
+          </Link>
+          <Link
+            to="/jobs"
+            style={{ ...btnGhost, textAlign: "center" }}
+            onClick={() => setIsMenuOpen(false)}
+          >
+            Jobs
+          </Link>
+          <Link
+            to="/notes"
+            style={{ ...btnGhost, textAlign: "center" }}
+            onClick={() => setIsMenuOpen(false)}
+          >
+            Notes
+          </Link>
+          <Link
+            to="/dashboard"
+            style={{ ...btnGhost, textAlign: "center" }}
+            onClick={() => setIsMenuOpen(false)}
+          >
+            Dashboard
+          </Link>
+          {userDoc?.role === "admin" && (
+            <Link
+              to="/admin"
+              style={{ ...btnGhost, textAlign: "center" }}
+              onClick={() => setIsMenuOpen(false)}
+            >
+              Admin
+            </Link>
+          )}
+          {!userDoc ? (
+            <button onClick={login} style={{ ...btn, width: "100%" }}>
+              Login
+            </button>
+          ) : (
+            <button onClick={logout} style={{ ...btn, width: "100%" }}>
+              Logout
+            </button>
+          )}
+        </div>
+      )}
+
+      <style>
+        {`
+          @media (max-width: 768px) {
+            .desktop-nav {
+              display: none !important;
+            }
+            .mobile-menu-btn {
+              display: flex !important;
+            }
+          }
+          @media (min-width: 769px) {
+            .mobile-nav {
+              display: none !important;
+            }
+          }
+        `}
+      </style>
     </div>
   );
 }
 
 /* ============================
-  SECTION wrapper component
-  ============================ */
+  SECTION wrapper component
+  ============================ */
 function Section({ title, actions, children }) {
   useEffect(() => {
-    if (title) document.title = `${title} — Prepji`;
+    if (title) document.title = `${title} — prepji`;
   }, [title]);
 
   return (
@@ -313,6 +454,8 @@ function Section({ title, actions, children }) {
           justifyContent: "space-between",
           alignItems: "center",
           marginBottom: 10,
+          flexWrap: "wrap",
+          gap: "10px",
         }}
       >
         <h2 style={{ margin: 0, fontSize: 18 }}>{title}</h2>
@@ -324,8 +467,8 @@ function Section({ title, actions, children }) {
 }
 
 /* ============================
-  ADMIN PANEL (tests, jobs, notes)
-  ============================ */
+  ADMIN PANEL (tests, jobs, notes)
+  ============================ */
 function AdminPanel({ userDoc }) {
   const [tab, setTab] = useState("tests");
 
@@ -345,7 +488,7 @@ function AdminPanel({ userDoc }) {
     <Section
       title="Admin Panel"
       actions={
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button
             style={tab === "tests" ? btn : btnGhost}
             onClick={() => setTab("tests")}
@@ -375,8 +518,8 @@ function AdminPanel({ userDoc }) {
 }
 
 /* ============================
-  ADMIN: Tests (sectional & non-sectional)
-  ============================ */
+  ADMIN: Tests (sectional & non-sectional)
+  ============================ */
 function AdminTests() {
   const initial = {
     title: "",
@@ -532,9 +675,9 @@ function AdminTests() {
           placeholder="Description"
           onChange={(e) => setForm({ ...form, description: e.target.value })}
         />
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <input
-            style={{ ...input, flex: 1 }}
+            style={{ ...input, flex: 1, minWidth: 120 }}
             type="number"
             min={5}
             max={180}
@@ -581,7 +724,14 @@ function AdminTests() {
 
         {form.hasSections ? (
           <div>
-            <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                marginBottom: 8,
+                flexWrap: "wrap",
+              }}
+            >
               <button style={btn} onClick={addSection}>
                 + Add Section
               </button>
@@ -591,9 +741,16 @@ function AdminTests() {
             </div>
             {(form.sections || []).map((s, si) => (
               <div key={si} style={{ ...card, marginBottom: 8 }}>
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                  }}
+                >
                   <input
-                    style={{ ...input, marginBottom: 0 }}
+                    style={{ ...input, marginBottom: 0, flex: 1 }}
                     value={s.name}
                     onChange={(e) => {
                       const c = JSON.parse(JSON.stringify(form));
@@ -648,9 +805,9 @@ function AdminTests() {
                         setForm(c);
                       }}
                     />
-                    <div style={{ display: "flex", gap: 8 }}>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       <select
-                        style={{ ...input, flex: 1 }}
+                        style={{ ...input, flex: 1, minWidth: 120 }}
                         value={q.ans}
                         onChange={(e) => {
                           const c = JSON.parse(JSON.stringify(form));
@@ -703,7 +860,14 @@ function AdminTests() {
           </div>
         ) : (
           <div>
-            <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                marginBottom: 8,
+                flexWrap: "wrap",
+              }}
+            >
               <button style={btn} onClick={addFlatQuestion}>
                 + Add Question
               </button>
@@ -746,9 +910,9 @@ function AdminTests() {
                     setForm(c);
                   }}
                 />
-                <div style={{ display: "flex", gap: 8 }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <select
-                    style={{ ...input, flex: 1 }}
+                    style={{ ...input, flex: 1, minWidth: 120 }}
                     value={q.ans}
                     onChange={(e) => {
                       const c = JSON.parse(JSON.stringify(form));
@@ -790,7 +954,7 @@ function AdminTests() {
           </div>
         )}
 
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button style={btn} onClick={save}>
             {editingId ? "Save Changes" : "Create Test"}
           </button>
@@ -820,6 +984,8 @@ function AdminTests() {
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
+                flexWrap: "wrap",
+                gap: "8px",
               }}
             >
               <div>
@@ -829,7 +995,7 @@ function AdminTests() {
                   {t.duration} min • {t.difficulty}
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button style={btnGhost} onClick={() => edit(t)}>
                   Edit
                 </button>
@@ -850,8 +1016,8 @@ function AdminTests() {
 }
 
 /* ============================
-  ADMIN: Jobs
-  ============================ */
+  ADMIN: Jobs
+  ============================ */
 function AdminJobs() {
   const empty = {
     title: "",
@@ -948,7 +1114,7 @@ function AdminJobs() {
           value={form.applyLink}
           onChange={(e) => setForm({ ...form, applyLink: e.target.value })}
         />
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button style={btn} onClick={save}>
             {editing ? "Save" : "Post"}
           </button>
@@ -977,7 +1143,14 @@ function AdminJobs() {
             <div style={smallMuted}>
               {j.department} • {j.state || "—"} • Last: {j.lastDate || "—"}
             </div>
-            <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                marginTop: 6,
+                flexWrap: "wrap",
+              }}
+            >
               <button style={btnGhost} onClick={() => edit(j)}>
                 Edit
               </button>
@@ -1001,8 +1174,8 @@ function AdminJobs() {
 }
 
 /* ============================
-  ADMIN: Notes (upload)
-  ============================ */
+  ADMIN: Notes (upload)
+  ============================ */
 function AdminNotes() {
   const initial = {
     title: "",
@@ -1092,15 +1265,15 @@ function AdminNotes() {
           value={form.title}
           onChange={(e) => setForm({ ...form, title: e.target.value })}
         />
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <input
-            style={{ ...input, flex: 1 }}
+            style={{ ...input, flex: 1, minWidth: 120 }}
             placeholder="Exam"
             value={form.exam}
             onChange={(e) => setForm({ ...form, exam: e.target.value })}
           />
           <input
-            style={{ ...input, flex: 1 }}
+            style={{ ...input, flex: 1, minWidth: 120 }}
             placeholder="Subject"
             value={form.subject}
             onChange={(e) => setForm({ ...form, subject: e.target.value })}
@@ -1118,7 +1291,14 @@ function AdminNotes() {
           value={form.description}
           onChange={(e) => setForm({ ...form, description: e.target.value })}
         />
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+            flexWrap: "wrap",
+          }}
+        >
           <input
             type="file"
             accept=".pdf,.doc,.docx,.ppt,.pptx,.txt"
@@ -1130,7 +1310,9 @@ function AdminNotes() {
             <small>{form.fileName}</small>
           ) : null}
         </div>
-        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+        <div
+          style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}
+        >
           <button style={btn} onClick={save}>
             {editing ? "Save" : "Upload"}
           </button>
@@ -1159,7 +1341,14 @@ function AdminNotes() {
             <div style={smallMuted}>
               {n.exam} • {n.subject} • {n.topic} • Downloads: {n.downloads || 0}
             </div>
-            <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                marginTop: 6,
+                flexWrap: "wrap",
+              }}
+            >
               <button style={btnGhost} onClick={() => edit(n)}>
                 Edit
               </button>
@@ -1183,8 +1372,8 @@ function AdminNotes() {
 }
 
 /* ============================
-  STUDENT: Tests list
-  ============================ */
+  STUDENT: Tests list
+  ============================ */
 function TestsList() {
   const [list, setList] = useState([]);
   useEffect(() => {
@@ -1217,6 +1406,8 @@ function TestsList() {
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: "10px",
                 }}
               >
                 <div>
@@ -1241,10 +1432,10 @@ function TestsList() {
 }
 
 /* ============================
-  ATTEMPT PAGE
-  dynamic for sectional / non-sectional
-  timer, auto-save, auto-submit, mark, navigator
-  ============================ */
+  ATTEMPT PAGE
+  dynamic for sectional / non-sectional
+  timer, auto-save, auto-submit, mark, navigator
+  ============================ */
 function AttemptPage({ user }) {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -1417,22 +1608,14 @@ function AttemptPage({ user }) {
   };
 
   const selectOption = (o) => {
-    // FIX: Add a guard clause to ensure 'answers' is not null.
-    if (answers === null) return;
-  
     if (!isSectional) {
-      const newAnswers = [...answers];
-      newAnswers[current.idx] = o;
-      setAnswers(newAnswers);
+      const a = [...answers];
+      a[current.idx] = o;
+      setAnswers(a);
     } else {
-      // FIX: Use a more robust immutable update pattern.
-      setAnswers(prevAnswers => {
-          const newAnswers = { ...prevAnswers };
-          const newSectionAnswers = [...(newAnswers[current.section] || [])];
-          newSectionAnswers[current.idx] = o;
-          newAnswers[current.section] = newSectionAnswers;
-          return newAnswers;
-      });
+      const copy = JSON.parse(JSON.stringify(answers));
+      copy[current.section][current.idx] = o;
+      setAnswers(copy);
     }
   };
 
@@ -1543,7 +1726,14 @@ function AttemptPage({ user }) {
     <Section
       title={test.title}
       actions={
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+            flexWrap: "wrap",
+          }}
+        >
           <div
             style={{
               padding: "6px 10px",
@@ -1597,6 +1787,8 @@ function AttemptPage({ user }) {
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
+              flexWrap: "wrap",
+              gap: "8px",
             }}
           >
             <div>
@@ -1627,6 +1819,7 @@ function AttemptPage({ user }) {
                     borderRadius: 8,
                     border: "1px solid #e5e7eb",
                     background: active ? "#e6ffed" : "#fff",
+                    cursor: "pointer",
                   }}
                 >
                   <strong style={{ marginRight: 8 }}>
@@ -1638,7 +1831,9 @@ function AttemptPage({ user }) {
             })}
           </div>
 
-          <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+          <div
+            style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}
+          >
             <button
               style={btnGhost}
               onClick={() => {
@@ -1737,12 +1932,13 @@ function AttemptPage({ user }) {
             gap: 8,
             justifyContent: "space-between",
             alignItems: "center",
+            flexWrap: "wrap",
           }}
         >
           <small style={smallMuted}>
             Autosaves every 8s. Timer will continue if you refresh the page.
           </small>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button
               style={btnGhost}
               onClick={() => {
@@ -1800,7 +1996,11 @@ function AttemptPage({ user }) {
         >
           {marked[`${current.section}_${current.idx}`] ? "Unmark" : "Mark"}
         </button>
-        <button style={{ ...btn, width: 120 }} onClick={confirmSubmit}>
+        <button
+          style={{ ...btn, width: 120 }}
+          onClick={confirmSubmit}
+          disabled={saving}
+        >
           {saving ? "Submitting..." : "Submit"}
         </button>
       </div>
@@ -1809,8 +2009,8 @@ function AttemptPage({ user }) {
 }
 
 /* ============================
-  REVIEW PAGE (solutions, charts, leaderboard)
-  ============================ */
+  REVIEW PAGE (solutions, charts, leaderboard)
+  ============================ */
 function ReviewPage() {
   const { testId, attemptId } = useParams();
   const [attempt, setAttempt] = useState(null);
@@ -2069,8 +2269,8 @@ function ReviewPage() {
 }
 
 /* ============================
-  LEADERBOARD component
-  ============================ */
+  LEADERBOARD component
+  ============================ */
 function Leaderboard({ testId, showUser }) {
   const [rows, setRows] = useState([]);
   useEffect(() => {
@@ -2097,6 +2297,8 @@ function Leaderboard({ testId, showUser }) {
             justifyContent: "space-between",
             padding: "6px 0",
             borderBottom: "1px dashed #f1f5f9",
+            flexWrap: "wrap",
+            gap: "4px",
           }}
         >
           <div>
@@ -2117,8 +2319,8 @@ function Leaderboard({ testId, showUser }) {
 }
 
 /* ============================
-  JOBS page
-  ============================ */
+  JOBS page
+  ============================ */
 function Jobs() {
   const [list, setList] = useState([]);
   const [qText, setQText] = useState("");
@@ -2161,9 +2363,10 @@ function Jobs() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr 1fr 1fr",
+            gridTemplateColumns: "1fr",
             gap: 8,
           }}
+          className="jobs-filter"
         >
           <input
             style={input}
@@ -2222,13 +2425,23 @@ function Jobs() {
         {filtered.length === 0 && <div>No jobs found.</div>}
       </div>
       <AdPlaceholder label="Jobs page ad" />
+
+      <style>
+        {`
+          @media (min-width: 768px) {
+            .jobs-filter {
+              grid-template-columns: 1fr 1fr 1fr !important;
+            }
+          }
+        `}
+      </style>
     </Section>
   );
 }
 
 /* ============================
-  NOTES page (preview + download)
-  ============================ */
+  NOTES page (preview + download)
+  ============================ */
 function Notes() {
   const [list, setList] = useState([]);
   const [exam, setExam] = useState("");
@@ -2271,15 +2484,15 @@ function Notes() {
   return (
     <Section title="Study Notes">
       <div style={card}>
-        <div style={{ display: "flex", gap: 8 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <input
-            style={{ ...input, flex: 1 }}
+            style={{ ...input, flex: 1, minWidth: 120 }}
             placeholder="Exam (e.g., SBI)"
             value={exam}
             onChange={(e) => setExam(e.target.value)}
           />
           <input
-            style={{ ...input, flex: 1 }}
+            style={{ ...input, flex: 1, minWidth: 120 }}
             placeholder="Subject (e.g., Quant)"
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
@@ -2303,7 +2516,14 @@ function Notes() {
             {n.description && (
               <div style={{ marginTop: 6 }}>{n.description}</div>
             )}
-            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                marginTop: 8,
+                flexWrap: "wrap",
+              }}
+            >
               <button style={btnGhost} onClick={() => setPreview(n)}>
                 Preview
               </button>
@@ -2318,7 +2538,14 @@ function Notes() {
 
       {preview && (
         <div style={{ ...card, marginTop: 12 }}>
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: "8px",
+            }}
+          >
             <strong>Preview: {preview.title}</strong>
             <button style={btnGhost} onClick={() => setPreview(null)}>
               Close
@@ -2342,8 +2569,8 @@ function Notes() {
 }
 
 /* ============================
-  DASHBOARD (attempt history)
-  ============================ */
+  DASHBOARD (attempt history)
+  ============================ */
 function Dashboard({ user }) {
   const [attempts, setAttempts] = useState([]);
   useEffect(() => {
@@ -2406,8 +2633,8 @@ function Dashboard({ user }) {
 }
 
 /* ============================
-  HOME
-  ============================ */
+  HOME
+  ============================ */
 function Home() {
   return (
     <Section
@@ -2420,7 +2647,7 @@ function Home() {
     >
       <div style={card}>
         <p>
-          Practice full-length and sectional mock tests for competitive exams.
+          Practice full-length and sectional mock tests for various exams.
           Timer, solutions, analytics, leaderboards — mobile friendly.
         </p>
         <ul>
@@ -2436,8 +2663,8 @@ function Home() {
 }
 
 /* ============================
-  MAIN APP
-  ============================ */
+  MAIN APP
+  ============================ */
 export default function App() {
   const { user, userDoc } = useAuthUser();
   return (
@@ -2465,7 +2692,7 @@ export default function App() {
           textAlign: "center",
         }}
       >
-        © {new Date().getFullYear()} Prepji
+        © {new Date().getFullYear()} prepji
       </footer>
     </Router>
   );
