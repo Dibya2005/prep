@@ -10,6 +10,8 @@ import {
   useParams,
 } from "react-router-dom";
 
+import { Helmet, HelmetProvider } from "react-helmet-async";
+
 import { initializeApp } from "firebase/app";
 import {
   getAuth,
@@ -75,6 +77,7 @@ const mobileWrap = {
   padding: 14,
   fontFamily: "Inter, Roboto, system-ui, -apple-system, sans-serif",
   color: "#111827",
+  lineHeight: 1.5,
 };
 const card = {
   background: "#fff",
@@ -112,7 +115,84 @@ const smallMuted = { fontSize: 12, color: "#6b7280" };
 /* ============================
   Admin seed emails
   ============================ */
-const ADMIN_SEED_EMAILS = ["nilamroychoudhury216@gmail.com"]; // replace with your admin email(s)
+const ADMIN_SEED_EMAILS = ["nilamroychoudhury216@gmail.com"];
+
+/* ============================
+  Helpers: slugify, canonical, csv
+  ============================ */
+const slugify = (s) =>
+  (s || "")
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
+
+const canonicalFor = (path) => {
+  if (typeof window === "undefined") return path;
+  try {
+    return `${window.location.origin}${path}`;
+  } catch {
+    return path;
+  }
+};
+
+/** Minimal robust CSV reader (handles quotes and commas inside) */
+function parseCSV(text) {
+  const rows = [];
+  let row = [];
+  let field = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '"') {
+      if (inQuotes && text[i + 1] === '"') {
+        field += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (ch === "," && !inQuotes) {
+      row.push(field);
+      field = "";
+    } else if ((ch === "\n" || ch === "\r") && !inQuotes) {
+      if (field.length || row.length) {
+        row.push(field);
+        rows.push(row);
+      }
+      if (ch === "\r" && text[i + 1] === "\n") i++;
+      row = [];
+      field = "";
+    } else {
+      field += ch;
+    }
+  }
+  if (field.length || row.length) {
+    row.push(field);
+    rows.push(row);
+  }
+  return rows;
+}
+
+function normalizeCSVHeader(h) {
+  return (h || "")
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "");
+}
+const CSV_HEADER = [
+  "q",
+  "option1",
+  "option2",
+  "option3",
+  "option4",
+  "ans",
+  "marks",
+  "solution",
+];
 
 /* ============================
   AdSense placeholder (dummy)
@@ -120,6 +200,8 @@ const ADMIN_SEED_EMAILS = ["nilamroychoudhury216@gmail.com"]; // replace with yo
 function AdPlaceholder({ label = "Ad" }) {
   return (
     <div
+      role="complementary"
+      aria-label={`${label} — placeholder`}
       style={{
         border: "1px dashed #e5e7eb",
         padding: 8,
@@ -223,6 +305,92 @@ function calculateResults(test, answers) {
 }
 
 /* ============================
+  SEO <Section/> wrapper
+  ============================ */
+function Section({
+  title,
+  actions,
+  children,
+  seo = {
+    description: "",
+    robots: "index,follow",
+    canonicalPath: null,
+    jsonLd: null, // object or array of objects
+    og: {}, // {type, image}
+  },
+}) {
+  useEffect(() => {
+    if (title) document.title = `${title} — prepji`;
+  }, [title]);
+
+  const canonical = seo.canonicalPath
+    ? canonicalFor(seo.canonicalPath)
+    : typeof window !== "undefined"
+    ? window.location.href
+    : "";
+
+  return (
+    <>
+      <Helmet>
+        {title && <title>{`${title} — prepji`}</title>}
+        {seo.description && (
+          <meta name="description" content={seo.description} />
+        )}
+        {seo.robots && <meta name="robots" content={seo.robots} />}
+        {canonical && <link rel="canonical" href={canonical} />}
+        {/* OpenGraph / Twitter */}
+        <meta property="og:site_name" content="prepji" />
+        {title && <meta property="og:title" content={`${title} — prepji`} />}
+        {seo.description && (
+          <meta property="og:description" content={seo.description} />
+        )}
+        <meta property="og:type" content={seo?.og?.type || "website"} />
+        {canonical && <meta property="og:url" content={canonical} />}
+        {seo?.og?.image && <meta property="og:image" content={seo.og.image} />}
+        <meta name="twitter:card" content="summary_large_image" />
+        {title && (
+          <meta name="twitter:title" content={`${title} — prepji`} />
+        )}
+        {seo.description && (
+          <meta name="twitter:description" content={seo.description} />
+        )}
+        {seo?.og?.image && (
+          <meta name="twitter:image" content={seo.og.image} />
+        )}
+        {/* JSON-LD */}
+        {seo.jsonLd &&
+          (Array.isArray(seo.jsonLd) ? seo.jsonLd : [seo.jsonLd]).map(
+            (obj, i) => (
+              <script
+                key={i}
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{ __html: JSON.stringify(obj) }}
+              />
+            )
+          )}
+      </Helmet>
+
+      <section style={{ ...mobileWrap, paddingTop: 16 }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 10,
+            flexWrap: "wrap",
+            gap: "10px",
+          }}
+        >
+          <h2 style={{ margin: 0, fontSize: 18 }}>{title}</h2>
+          {actions}
+        </div>
+        {children}
+      </section>
+    </>
+  );
+}
+
+/* ============================
   NAVBAR - Mobile Friendly
   ============================ */
 function Navbar({ userDoc }) {
@@ -246,6 +414,8 @@ function Navbar({ userDoc }) {
 
   return (
     <div
+      role="navigation"
+      aria-label="Main navigation"
       style={{
         position: "sticky",
         top: 0,
@@ -267,6 +437,7 @@ function Navbar({ userDoc }) {
           to="/"
           style={{ textDecoration: "none", color: "#0f172a" }}
           onClick={() => setIsMenuOpen(false)}
+          aria-label="Go to home"
         >
           <strong style={{ fontSize: 18 }}>prepji</strong>
         </Link>
@@ -274,6 +445,7 @@ function Navbar({ userDoc }) {
         {/* Hamburger menu for mobile */}
         <button
           onClick={toggleMenu}
+          aria-label="Toggle menu"
           style={{
             ...btnGhost,
             display: "none",
@@ -439,34 +611,6 @@ function Navbar({ userDoc }) {
 }
 
 /* ============================
-  SECTION wrapper component
-  ============================ */
-function Section({ title, actions, children }) {
-  useEffect(() => {
-    if (title) document.title = `${title} — prepji`;
-  }, [title]);
-
-  return (
-    <section style={{ ...mobileWrap, paddingTop: 16 }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 10,
-          flexWrap: "wrap",
-          gap: "10px",
-        }}
-      >
-        <h2 style={{ margin: 0, fontSize: 18 }}>{title}</h2>
-        {actions}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-/* ============================
   ADMIN PANEL (tests, jobs, notes)
   ============================ */
 function AdminPanel({ userDoc }) {
@@ -475,7 +619,15 @@ function AdminPanel({ userDoc }) {
   if (!userDoc) return <Navigate to="/" replace />;
   if (userDoc.role !== "admin") {
     return (
-      <Section title="Admin">
+      <Section
+        title="Admin"
+        seo={{
+          description:
+            "Admin area for managing tests, jobs, and study notes on prepji.",
+          robots: "noindex,nofollow",
+          canonicalPath: "/admin",
+        }}
+      >
         <div style={card}>
           You must be an admin to see this page. Set your role in Firestore
           `users` collection.
@@ -487,6 +639,12 @@ function AdminPanel({ userDoc }) {
   return (
     <Section
       title="Admin Panel"
+      seo={{
+        description:
+          "Create mock tests (sectional & non‑sectional), post jobs, upload notes.",
+        robots: "noindex,nofollow",
+        canonicalPath: "/admin",
+      }}
       actions={
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button
@@ -519,6 +677,7 @@ function AdminPanel({ userDoc }) {
 
 /* ============================
   ADMIN: Tests (sectional & non-sectional)
+  + Bulk CSV/JSON import (100 per upload)
   ============================ */
 function AdminTests() {
   const initial = {
@@ -529,14 +688,22 @@ function AdminTests() {
     sections: [],
     questions: [],
     difficulty: "Medium",
+    slug: "",
+    tags: "",
   };
   const [form, setForm] = useState(initial);
   const [list, setList] = useState([]);
   const [editingId, setEditingId] = useState(null);
+  const MAX_IMPORT = 100;
+
+  // derived helpers
+  const totalCount = form.hasSections
+    ? (form.sections || []).reduce((a, s) => a + (s.questions || []).length, 0)
+    : (form.questions || []).length;
 
   useEffect(() => {
-    const q = query(collection(db, "mock_tests"), orderBy("createdAt", "desc"));
-    const unsub = onSnapshot(q, (snap) =>
+    const qy = query(collection(db, "mock_tests"), orderBy("createdAt", "desc"));
+    const unsub = onSnapshot(qy, (snap) =>
       setList(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
     return unsub;
@@ -550,6 +717,7 @@ function AdminTests() {
         { name: `Section ${(s.sections || []).length + 1}`, questions: [] },
       ],
     }));
+
   const addQToSection = (si) => {
     const copy = JSON.parse(JSON.stringify(form));
     copy.sections[si].questions.push({
@@ -561,6 +729,7 @@ function AdminTests() {
     });
     setForm(copy);
   };
+
   const addFlatQuestion = () =>
     setForm((s) => ({
       ...s,
@@ -570,11 +739,212 @@ function AdminTests() {
       ],
     }));
 
+  const validateQuestion = (q) => {
+    if (!q || !q.q) return "Question text missing";
+    if (!Array.isArray(q.options) || q.options.length !== 4)
+      return "Exactly 4 options required";
+    if (q.ans == null || isNaN(q.ans) || q.ans < 0 || q.ans > 3)
+      return "Answer index must be 0–3";
+    return null;
+  };
+
+  const parseRowsToQuestions = (rows) => {
+    if (!rows || !rows.length) return [];
+    const headers = rows[0].map((h) => normalizeCSVHeader(h));
+    const map = {};
+    CSV_HEADER.forEach((key) => {
+      const idx = headers.indexOf(key);
+      if (idx >= 0) map[key] = idx;
+    });
+    if (Object.keys(map).length < 6) {
+      throw new Error(
+        "CSV header must include at least q, option1..4, ans (optional: marks, solution)"
+      );
+    }
+
+    const qs = [];
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      if (!r || r.length === 0) continue;
+      const q = (r[map.q] || "").trim();
+      if (!q) continue; // skip empty row
+      const o1 = (r[map.option1] || "").trim();
+      const o2 = (r[map.option2] || "").trim();
+      const o3 = (r[map.option3] || "").trim();
+      const o4 = (r[map.option4] || "").trim();
+      const ansRaw = (r[map.ans] || "").toString().trim();
+      const marks =
+        map.marks != null && (r[map.marks] || "").toString().trim() !== ""
+          ? Number(r[map.marks])
+          : 1;
+      const solution =
+        map.solution != null ? (r[map.solution] || "").toString() : "";
+
+      let ans = Number(ansRaw);
+      // support 1–4 input
+      if (!isNaN(ans)) ans = ans - 1;
+      if (isNaN(ans) || ans < 0 || ans > 3) {
+        throw new Error(
+          `Row ${i + 1}: "ans" must be 1-4 (found "${ansRaw}")`
+        );
+      }
+
+      const qObj = {
+        q,
+        options: [o1, o2, o3, o4],
+        ans,
+        marks: isNaN(marks) || marks <= 0 ? 1 : marks,
+        solution,
+      };
+      const err = validateQuestion(qObj);
+      if (err) throw new Error(`Row ${i + 1}: ${err}`);
+      qs.push(qObj);
+      if (qs.length >= MAX_IMPORT) break;
+    }
+    return qs;
+  };
+
+  const handleImportCSV = (targetSectionIndex = null) => async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-picking same file next time
+    if (!file) return;
+    try {
+      const txt = await file.text();
+      const rows = parseCSV(txt);
+      const qs = parseRowsToQuestions(rows);
+      if (qs.length === 0) {
+        alert("No valid rows found.");
+        return;
+      }
+      if (form.hasSections) {
+        if (
+          targetSectionIndex == null ||
+          targetSectionIndex < 0 ||
+          targetSectionIndex >= (form.sections || []).length
+        ) {
+          alert("Invalid section index.");
+          return;
+        }
+        const copy = JSON.parse(JSON.stringify(form));
+        copy.sections[targetSectionIndex].questions.push(...qs);
+        setForm(copy);
+      } else {
+        setForm((s) => ({ ...s, questions: [...(s.questions || []), ...qs] }));
+      }
+      alert(
+        `Imported ${qs.length} question(s). (Max ${MAX_IMPORT} per upload)`
+      );
+    } catch (err) {
+      console.error(err);
+      alert(`Import failed: ${err.message || err.toString()}`);
+    }
+  };
+
+  const handlePasteCSV = (targetSectionIndex = null) => {
+    const raw = window.prompt(
+      `Paste CSV starting with header:\n${CSV_HEADER.join(",")}`
+    );
+    if (!raw) return;
+    try {
+      const rows = parseCSV(raw);
+      const qs = parseRowsToQuestions(rows);
+      if (qs.length === 0) {
+        alert("No valid rows found.");
+        return;
+      }
+      if (form.hasSections) {
+        if (
+          targetSectionIndex == null ||
+          targetSectionIndex < 0 ||
+          targetSectionIndex >= (form.sections || []).length
+        ) {
+          alert("Invalid section index.");
+          return;
+        }
+        const copy = JSON.parse(JSON.stringify(form));
+        copy.sections[targetSectionIndex].questions.push(...qs);
+        setForm(copy);
+      } else {
+        setForm((s) => ({ ...s, questions: [...(s.questions || []), ...qs] }));
+      }
+      alert(
+        `Imported ${qs.length} question(s). (Max ${MAX_IMPORT} per upload)`
+      );
+    } catch (err) {
+      alert(`Invalid CSV: ${err.message || err.toString()}`);
+    }
+  };
+
+  const downloadCSVTemplate = () => {
+    const sample = [
+      CSV_HEADER.join(","),
+      `"What is 2+2?","2","3","4","5",3,1,"Add 2 and 2"`,
+    ].join("\n");
+    const blob = new Blob([sample], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "prepji_questions_template.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  // Existing JSON import (now validates and supports sectional target)
+  const importJSON = (targetSectionIndex = null) => {
+    const raw = window.prompt(
+      "Paste JSON array of questions: [{ q, options[4], ans (0-3 or 1-4), marks, solution }]."
+    );
+    if (!raw) return;
+    try {
+      const arr = JSON.parse(raw);
+      if (!Array.isArray(arr)) throw new Error("Invalid JSON (not an array).");
+
+      const normalize = (q) => {
+        const ans =
+          q.ans != null && Number(q.ans) >= 1 && Number(q.ans) <= 4
+            ? Number(q.ans) - 1
+            : Number(q.ans);
+        return {
+          q: q.q || "",
+          options: Array.isArray(q.options) ? q.options.slice(0, 4) : ["", "", "", ""],
+          ans: ans,
+          marks: Number(q.marks) > 0 ? Number(q.marks) : 1,
+          solution: q.solution || "",
+        };
+      };
+
+      const qs = arr.slice(0, MAX_IMPORT).map(normalize);
+      qs.forEach((q, i) => {
+        const err = validateQuestion(q);
+        if (err) throw new Error(`Item ${i + 1}: ${err}`);
+      });
+
+      if (form.hasSections && targetSectionIndex != null) {
+        const copy = JSON.parse(JSON.stringify(form));
+        copy.sections[targetSectionIndex].questions.push(...qs);
+        setForm(copy);
+      } else if (!form.hasSections) {
+        setForm((s) => ({ ...s, questions: [...(s.questions || []), ...qs] }));
+      } else {
+        alert("Pick a section to import into.");
+        return;
+      }
+      alert(`Imported ${qs.length} question(s).`);
+    } catch (e) {
+      alert(`Invalid JSON: ${e.message || e.toString()}`);
+    }
+  };
+
   const save = async () => {
     if (!form.title.trim()) {
       alert("Title is required");
       return;
     }
+    // derive slug (stable across edits if title unchanged)
+    const slug =
+      (form.slug || "").trim() || slugify(form.title).slice(0, 60) || "";
     const payload = {
       title: form.title,
       description: form.description,
@@ -583,6 +953,8 @@ function AdminTests() {
       sections: form.hasSections ? form.sections : [],
       questions: form.hasSections ? [] : form.questions,
       difficulty: form.difficulty,
+      slug,
+      tags: form.tags || "",
       totalQuestions: form.hasSections
         ? (form.sections || []).reduce(
             (a, s) => a + (s.questions || []).length,
@@ -591,6 +963,19 @@ function AdminTests() {
         : (form.questions || []).length,
       createdAt: serverTimestamp(),
     };
+
+    // validate count > 0
+    const totalQs = payload.totalQuestions || 0;
+    if (totalQs === 0) {
+      if (
+        !window.confirm(
+          "This test currently has 0 questions. Save anyway (for drafting)?"
+        )
+      ) {
+        return;
+      }
+    }
+
     try {
       if (editingId) {
         await updateDoc(doc(db, "mock_tests", editingId), payload);
@@ -603,7 +988,9 @@ function AdminTests() {
       setEditingId(null);
     } catch (e) {
       console.error(e);
-      alert("Failed to save test");
+      alert(
+        "Failed to save test. If your test is extremely large, you might be hitting Firestore document size limits."
+      );
     }
   };
 
@@ -617,6 +1004,8 @@ function AdminTests() {
       sections: t.sections || [],
       questions: t.questions || [],
       difficulty: t.difficulty || "Medium",
+      slug: t.slug || "",
+      tags: t.tags || "",
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -626,53 +1015,25 @@ function AdminTests() {
     await deleteDoc(doc(db, "mock_tests", id));
   };
 
-  // import JSON helper
-  const importJSON = () => {
-    const raw = window.prompt(
-      "Paste JSON array of questions (q, options[4], ans, marks, solution). For sectional tests, you'll be asked the section index."
-    );
-    if (!raw) return;
-    try {
-      const arr = JSON.parse(raw);
-      if (!Array.isArray(arr)) throw new Error("Invalid JSON");
-      if (form.hasSections) {
-        const idx = Number(
-          window.prompt(
-            `Section index (0..${(form.sections || []).length - 1})`
-          )
-        );
-        if (isNaN(idx) || idx < 0 || idx >= (form.sections || []).length) {
-          alert("Invalid section index");
-          return;
-        }
-        const copy = JSON.parse(JSON.stringify(form));
-        copy.sections[idx].questions.push(...arr);
-        setForm(copy);
-      } else {
-        setForm((s) => ({ ...s, questions: [...(s.questions || []), ...arr] }));
-      }
-      alert("Imported");
-    } catch (e) {
-      alert("Invalid JSON");
-    }
-  };
-
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
       <div style={card}>
         <h3 style={{ marginTop: 0 }}>
           {editingId ? "Edit Test" : "Create Mock Test"}
         </h3>
+
         <input
           style={input}
           value={form.title}
           placeholder="Title"
-          onChange={(e) => setForm({ ...form, title: e.target.value })}
+          onChange={(e) =>
+            setForm({ ...form, title: e.target.value, slug: slugify(e.target.value) })
+          }
         />
         <textarea
           style={{ ...input, minHeight: 80 }}
           value={form.description}
-          placeholder="Description"
+          placeholder="Short description (shows in SEO & list)"
           onChange={(e) => setForm({ ...form, description: e.target.value })}
         />
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -689,11 +1050,27 @@ function AdminTests() {
             style={{ ...input, width: 160 }}
             value={form.difficulty}
             onChange={(e) => setForm({ ...form, difficulty: e.target.value })}
+            aria-label="Difficulty"
           >
             <option>Easy</option>
             <option>Medium</option>
             <option>Hard</option>
           </select>
+        </div>
+
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <input
+            style={{ ...input, flex: 2, minWidth: 160 }}
+            value={form.slug}
+            placeholder="Optional slug (auto from title)"
+            onChange={(e) => setForm({ ...form, slug: slugify(e.target.value) })}
+          />
+          <input
+            style={{ ...input, flex: 3, minWidth: 160 }}
+            value={form.tags}
+            placeholder="Tags (comma separated)"
+            onChange={(e) => setForm({ ...form, tags: e.target.value })}
+          />
         </div>
 
         <label
@@ -722,6 +1099,46 @@ function AdminTests() {
           Sectional test (enable sections)
         </label>
 
+        {/* Bulk import helpers */}
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            marginBottom: 8,
+            flexWrap: "wrap",
+          }}
+        >
+          {!form.hasSections ? (
+            <>
+              <label style={{ ...btnGhost, cursor: "pointer" }}>
+                Import CSV (≤100)
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={handleImportCSV(null)}
+                  style={{ display: "none" }}
+                />
+              </label>
+              <button style={btnGhost} onClick={() => handlePasteCSV(null)}>
+                Paste CSV
+              </button>
+              <button style={btnGhost} onClick={downloadCSVTemplate}>
+                Download CSV template
+              </button>
+              <button style={btnGhost} onClick={() => importJSON(null)}>
+                Import JSON
+              </button>
+            </>
+          ) : (
+            <>
+              <button style={btnGhost} onClick={downloadCSVTemplate}>
+                Download CSV template
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* Editor */}
         {form.hasSections ? (
           <div>
             <div
@@ -734,9 +1151,6 @@ function AdminTests() {
             >
               <button style={btn} onClick={addSection}>
                 + Add Section
-              </button>
-              <button style={btnGhost} onClick={importJSON}>
-                Import Questions JSON
               </button>
             </div>
             {(form.sections || []).map((s, si) => (
@@ -769,6 +1183,26 @@ function AdminTests() {
                     Remove Section
                   </button>
                 </div>
+
+                {/* Section import buttons */}
+                <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
+                  <label style={{ ...btnGhost, cursor: "pointer" }}>
+                    Import CSV to "{s.name}" (≤100)
+                    <input
+                      type="file"
+                      accept=".csv,text/csv"
+                      onChange={handleImportCSV(si)}
+                      style={{ display: "none" }}
+                    />
+                  </label>
+                  <button style={btnGhost} onClick={() => handlePasteCSV(si)}>
+                    Paste CSV to "{s.name}"
+                  </button>
+                  <button style={btnGhost} onClick={() => importJSON(si)}>
+                    Import JSON to "{s.name}"
+                  </button>
+                </div>
+
                 {(s.questions || []).map((q, qi) => (
                   <div key={qi} style={{ ...card, marginTop: 8 }}>
                     <input
@@ -807,6 +1241,7 @@ function AdminTests() {
                     />
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                       <select
+                        aria-label="Correct option"
                         style={{ ...input, flex: 1, minWidth: 120 }}
                         value={q.ans}
                         onChange={(e) => {
@@ -871,9 +1306,6 @@ function AdminTests() {
               <button style={btn} onClick={addFlatQuestion}>
                 + Add Question
               </button>
-              <button style={btnGhost} onClick={importJSON}>
-                Import Questions JSON
-              </button>
             </div>
             {(form.questions || []).map((q, qi) => (
               <div key={qi} style={{ ...card, marginBottom: 8 }}>
@@ -912,6 +1344,7 @@ function AdminTests() {
                 />
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <select
+                    aria-label="Correct option"
                     style={{ ...input, flex: 1, minWidth: 120 }}
                     value={q.ans}
                     onChange={(e) => {
@@ -970,6 +1403,10 @@ function AdminTests() {
             </button>
           )}
         </div>
+
+        <div style={{ marginTop: 8, ...smallMuted }}>
+          Total questions in this test: <strong>{totalCount}</strong>
+        </div>
       </div>
 
       <div style={card}>
@@ -1002,7 +1439,10 @@ function AdminTests() {
                 <button style={btnGhost} onClick={() => remove(t.id)}>
                   Delete
                 </button>
-                <Link to={`/tests/${t.id}`} style={btnGhost}>
+                <Link
+                  to={`/tests/${t.id}/${t.slug || slugify(t.title)}`}
+                  style={btnGhost}
+                >
                   Open
                 </Link>
               </div>
@@ -1032,8 +1472,8 @@ function AdminJobs() {
   const [editing, setEditing] = useState(null);
 
   useEffect(() => {
-    const q = query(collection(db, "jobs"), orderBy("createdAt", "desc"));
-    const unsub = onSnapshot(q, (snap) =>
+    const qy = query(collection(db, "jobs"), orderBy("createdAt", "desc"));
+    const unsub = onSnapshot(qy, (snap) =>
       setList(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
     return unsub;
@@ -1192,8 +1632,8 @@ function AdminNotes() {
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
-    const q = query(collection(db, "notes"), orderBy("createdAt", "desc"));
-    const unsub = onSnapshot(q, (snap) =>
+    const qy = query(collection(db, "notes"), orderBy("createdAt", "desc"));
+    const unsub = onSnapshot(qy, (snap) =>
       setList(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
     return unsub;
@@ -1377,15 +1817,38 @@ function AdminNotes() {
 function TestsList() {
   const [list, setList] = useState([]);
   useEffect(() => {
-    const q = query(collection(db, "mock_tests"), orderBy("createdAt", "desc"));
-    const unsub = onSnapshot(q, (snap) =>
+    const qy = query(collection(db, "mock_tests"), orderBy("createdAt", "desc"));
+    const unsub = onSnapshot(qy, (snap) =>
       setList(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
     return unsub;
   }, []);
+
+  // JSON-LD ItemList for SEO
+  const jsonLd =
+    list.length > 0
+      ? {
+          "@context": "https://schema.org",
+          "@type": "ItemList",
+          itemListElement: list.slice(0, 50).map((t, i) => ({
+            "@type": "ListItem",
+            position: i + 1,
+            url: canonicalFor(`/tests/${t.id}/${t.slug || slugify(t.title)}`),
+            name: t.title,
+          })),
+        }
+      : null;
+
   return (
     <Section
       title="Mock Tests"
+      seo={{
+        description:
+          "Practice full-length and sectional mock tests with timer, solutions, analytics and leaderboards.",
+        canonicalPath: "/tests",
+        jsonLd,
+        og: { type: "website" },
+      }}
       actions={
         <Link to="/dashboard" style={btnGhost}>
           My Dashboard
@@ -1397,8 +1860,9 @@ function TestsList() {
         {list.map((t) => (
           <Link
             key={t.id}
-            to={`/tests/${t.id}`}
+            to={`/tests/${t.id}/${t.slug || slugify(t.title)}`}
             style={{ textDecoration: "none", color: "#111827" }}
+            aria-label={`Open test ${t.title}`}
           >
             <div style={card}>
               <div
@@ -1421,7 +1885,9 @@ function TestsList() {
                   <button style={btn}>Start</button>
                 </div>
               </div>
-              <p style={{ marginTop: 8, opacity: 0.85 }}>{t.description}</p>
+              {t.description && (
+                <p style={{ marginTop: 8, opacity: 0.85 }}>{t.description}</p>
+              )}
             </div>
           </Link>
         ))}
@@ -1435,6 +1901,7 @@ function TestsList() {
   ATTEMPT PAGE
   dynamic for sectional / non-sectional
   timer, auto-save, auto-submit, mark, navigator
+  + keyboard shortcuts + leave protection
   ============================ */
 function AttemptPage({ user }) {
   const { id } = useParams();
@@ -1461,12 +1928,14 @@ function AttemptPage({ user }) {
           userId: user.uid,
           username: user.displayName || user.email,
           mockTestId: test.id,
+          mockTestTitle: test.title, // helpful for dashboard/leaderboard
           hasSections: test.hasSections || false,
           sectionScores: res.sectionScores || [],
           totalScore: res.totalScore,
           totalMarks: res.totalMarks,
           totalQuestions: res.totalQuestions,
           answers,
+          startedAtEpoch: startedAt || Date.now(),
           startedAt: serverTimestamp(),
           submittedAt: serverTimestamp(),
           timeTakenSec: test.duration * 60 - secondsLeft,
@@ -1482,7 +1951,7 @@ function AttemptPage({ user }) {
         setSaving(false);
       }
     },
-    [answers, LS_KEY, navigate, secondsLeft, test, user]
+    [answers, LS_KEY, navigate, secondsLeft, test, user, startedAt]
   );
 
   const autoSubmit = useCallback(async () => {
@@ -1518,7 +1987,7 @@ function AttemptPage({ user }) {
             }
             return;
           }
-        } catch (e) {
+        } catch {
           /* ignore */
         }
       }
@@ -1526,29 +1995,75 @@ function AttemptPage({ user }) {
       const now = Date.now();
       setStartedAt(now);
       if (!t.hasSections) {
-        setAnswers(Array((t.questions || []).length).fill(null));
+        const a = Array((t.questions || []).length).fill(null);
+        setAnswers(a);
+        localStorage.setItem(
+          LS_KEY,
+          JSON.stringify({
+            testId: id,
+            startedAt: now,
+            answers: a,
+            current: { section: 0, idx: 0 },
+            marked: {},
+          })
+        );
       } else {
         const obj = {};
         (t.sections || []).forEach(
           (s, si) => (obj[si] = Array((s.questions || []).length).fill(null))
         );
         setAnswers(obj);
+        localStorage.setItem(
+          LS_KEY,
+          JSON.stringify({
+            testId: id,
+            startedAt: now,
+            answers: obj, // FIX: seed sectional answers correctly
+            current: { section: 0, idx: 0 },
+            marked: {},
+          })
+        );
       }
       setSecondsLeft(t.duration * 60);
-      localStorage.setItem(
-        LS_KEY,
-        JSON.stringify({
-          testId: id,
-          startedAt: now,
-          answers: !t.hasSections
-            ? Array((t.questions || []).length).fill(null)
-            : {},
-          current: { section: 0, idx: 0 },
-          marked: {},
-        })
-      );
     })();
   }, [id, LS_KEY, autoSubmit]);
+
+  // leave protection while attempt active
+  useEffect(() => {
+    const handler = (e) => {
+      if (secondsLeft > 0 && !saving) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [secondsLeft, saving]);
+
+  // keyboard shortcuts
+  useEffect(() => {
+    const onKey = (e) => {
+      if (!test) return;
+      if (["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName)) return;
+
+      if (e.key >= "1" && e.key <= "4") {
+        e.preventDefault();
+        selectOption(Number(e.key) - 1);
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        goNext();
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        goPrev();
+      } else if (e.key.toLowerCase() === "m") {
+        e.preventDefault();
+        toggleMark();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [test, current, answers]);
 
   const handleAutoSubmit = useCallback(
     () => submitAttempt(true),
@@ -1583,19 +2098,28 @@ function AttemptPage({ user }) {
 
   if (loading)
     return (
-      <Section title="Loading...">
+      <Section
+        title="Loading..."
+        seo={{ robots: "noindex,nofollow", canonicalPath: `/tests/${id}` }}
+      >
         <div style={card}>Loading test...</div>
       </Section>
     );
   if (!test)
     return (
-      <Section title="Not found">
+      <Section
+        title="Not found"
+        seo={{ robots: "noindex,nofollow", canonicalPath: `/tests/${id}` }}
+      >
         <div style={card}>Test not found.</div>
       </Section>
     );
   if (!user)
     return (
-      <Section title="Login required">
+      <Section
+        title="Login required"
+        seo={{ robots: "noindex,nofollow", canonicalPath: `/tests/${id}` }}
+      >
         <div style={card}>Please login to attempt the test.</div>
       </Section>
     );
@@ -1635,6 +2159,43 @@ function AttemptPage({ user }) {
   const minutes = Math.floor(secondsLeft / 60);
   const secs = secondsLeft % 60;
 
+  const goPrev = () => {
+    if (isSectional) {
+      if (current.idx > 0) setCurrent((c) => ({ ...c, idx: c.idx - 1 }));
+      else if (current.section > 0) {
+        const prev = current.section - 1;
+        setCurrent({
+          section: prev,
+          idx: (test.sections[prev].questions || []).length - 1,
+        });
+      }
+    } else {
+      setCurrent((c) => ({ ...c, idx: Math.max(0, c.idx - 1) }));
+    }
+  };
+
+  const goNext = () => {
+    if (isSectional) {
+      if (current.idx < test.sections[current.section].questions.length - 1) {
+        setCurrent((c) => ({ ...c, idx: c.idx + 1 }));
+      } else {
+        let moved = false;
+        for (let s = current.section + 1; s < test.sections.length; s++) {
+          if ((test.sections[s].questions || []).length > 0) {
+            setCurrent({ section: s, idx: 0 });
+            moved = true;
+            break;
+          }
+        }
+        if (!moved) alert("End of test. Submit when ready.");
+      }
+    } else if (current.idx < test.questions.length - 1) {
+      setCurrent((c) => ({ ...c, idx: c.idx + 1 }));
+    } else {
+      confirmSubmit();
+    }
+  };
+
   const Navigator = () => {
     if (!isSectional) {
       return (
@@ -1643,6 +2204,7 @@ function AttemptPage({ user }) {
             <button
               key={i}
               onClick={() => setCurrent({ section: 0, idx: i })}
+              aria-label={`Go to question ${i + 1}`}
               style={{
                 ...btnGhost,
                 width: 40,
@@ -1693,6 +2255,7 @@ function AttemptPage({ user }) {
                   <button
                     key={qi}
                     onClick={() => setCurrent({ section: si, idx: qi })}
+                    aria-label={`Go to ${s.name} question ${qi + 1}`}
                     style={{
                       ...btnGhost,
                       width: 40,
@@ -1722,9 +2285,36 @@ function AttemptPage({ user }) {
     }
   };
 
+  const answeredCount = (() => {
+    if (!test) return 0;
+    if (!isSectional) return (answers || []).filter((a) => a !== null).length;
+    let c = 0;
+    (test.sections || []).forEach((s, si) => {
+      (answers?.[si] || []).forEach((a) => {
+        if (a !== null) c++;
+      });
+    });
+    return c;
+  })();
+
+  const totalQs =
+    test?.totalQuestions ||
+    (!isSectional
+      ? (test.questions || []).length
+      : (test.sections || []).reduce(
+          (acc, s) => acc + (s.questions || []).length,
+          0
+        ));
+
   return (
     <Section
       title={test.title}
+      seo={{
+        description: test.description || "Attempt this mock test on prepji.",
+        robots: "noindex,nofollow",
+        canonicalPath: `/tests/${test.id}/${test.slug || slugify(test.title)}`,
+        og: { type: "article" },
+      }}
       actions={
         <div
           style={{
@@ -1735,6 +2325,7 @@ function AttemptPage({ user }) {
           }}
         >
           <div
+            aria-label="Timer"
             style={{
               padding: "6px 10px",
               borderRadius: 8,
@@ -1746,6 +2337,7 @@ function AttemptPage({ user }) {
             {String(minutes).padStart(2, "0")}:{String(secs).padStart(2, "0")}
           </div>
           <div
+            title="Time progress"
             style={{
               width: 120,
               height: 8,
@@ -1770,6 +2362,9 @@ function AttemptPage({ user }) {
                 background: "#0f172a",
               }}
             />
+          </div>
+          <div aria-label="Answered count" style={smallMuted}>
+            {answeredCount}/{totalQs} answered
           </div>
           <button style={btnGhost} onClick={toggleMark}>
             Mark
@@ -1812,6 +2407,8 @@ function AttemptPage({ user }) {
                 <button
                   key={oi}
                   onClick={() => selectOption(oi)}
+                  aria-pressed={active}
+                  aria-label={`Select option ${String.fromCharCode(65 + oi)}`}
                   style={{
                     textAlign: "left",
                     width: "100%",
@@ -1834,63 +2431,23 @@ function AttemptPage({ user }) {
           <div
             style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}
           >
-            <button
-              style={btnGhost}
-              onClick={() => {
-                if (isSectional) {
-                  if (current.idx > 0)
-                    setCurrent((c) => ({ ...c, idx: c.idx - 1 }));
-                  else if (current.section > 0) {
-                    const prev = current.section - 1;
-                    setCurrent({
-                      section: prev,
-                      idx: (test.sections[prev].questions || []).length - 1,
-                    });
-                  }
-                } else {
-                  setCurrent((c) => ({ ...c, idx: Math.max(0, c.idx - 1) }));
-                }
-              }}
-            >
+            <button style={btnGhost} onClick={goPrev}>
               Previous
             </button>
 
             {isSectional ? (
               current.idx <
               test.sections[current.section].questions.length - 1 ? (
-                <button
-                  style={btn}
-                  onClick={() => setCurrent((c) => ({ ...c, idx: c.idx + 1 }))}
-                >
+                <button style={btn} onClick={goNext}>
                   Next
                 </button>
               ) : (
-                <button
-                  style={btn}
-                  onClick={() => {
-                    let moved = false;
-                    for (
-                      let s = current.section + 1;
-                      s < test.sections.length;
-                      s++
-                    ) {
-                      if ((test.sections[s].questions || []).length > 0) {
-                        setCurrent({ section: s, idx: 0 });
-                        moved = true;
-                        break;
-                      }
-                    }
-                    if (!moved) alert("End of test. Submit when ready.");
-                  }}
-                >
+                <button style={btn} onClick={goNext}>
                   Next Section
                 </button>
               )
             ) : current.idx < test.questions.length - 1 ? (
-              <button
-                style={btn}
-                onClick={() => setCurrent((c) => ({ ...c, idx: c.idx + 1 }))}
-              >
+              <button style={btn} onClick={goNext}>
                 Next
               </button>
             ) : (
@@ -2035,13 +2592,25 @@ function ReviewPage() {
 
   if (loading)
     return (
-      <Section title="Loading...">
+      <Section
+        title="Loading..."
+        seo={{
+          robots: "noindex,nofollow",
+          canonicalPath: `/tests/${testId}/review/${attemptId}`,
+        }}
+      >
         <div style={card}>Loading...</div>
       </Section>
     );
   if (!attempt || !test)
     return (
-      <Section title="Not found">
+      <Section
+        title="Not found"
+        seo={{
+          robots: "noindex,nofollow",
+          canonicalPath: `/tests/${testId}/review/${attemptId}`,
+        }}
+      >
         <div style={card}>Not found.</div>
       </Section>
     );
@@ -2077,7 +2646,14 @@ function ReviewPage() {
   const COLORS = ["#16a34a", "#ef4444", "#f59e0b"];
 
   return (
-    <Section title={`Review — ${test.title}`}>
+    <Section
+      title={`Review — ${test.title}`}
+      seo={{
+        robots: "noindex,nofollow",
+        canonicalPath: `/tests/${test.id}/review/${attempt.id}`,
+        og: { type: "article" },
+      }}
+    >
       <div style={{ display: "grid", gap: 12 }}>
         <div style={card}>
           <h3 style={{ marginTop: 0 }}>
@@ -2274,13 +2850,13 @@ function ReviewPage() {
 function Leaderboard({ testId, showUser }) {
   const [rows, setRows] = useState([]);
   useEffect(() => {
-    const q = query(
+    const qy = query(
       collection(db, "attempts"),
       where("mockTestId", "==", testId),
       orderBy("totalScore", "desc"),
       limit(50)
     );
-    const unsub = onSnapshot(q, (snap) =>
+    const unsub = onSnapshot(qy, (snap) =>
       setRows(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
     return unsub;
@@ -2289,7 +2865,7 @@ function Leaderboard({ testId, showUser }) {
   if (rows.length === 0) return <div>No attempts yet.</div>;
   return (
     <div>
-      {rows.map((r, i) => (
+      {rows.slice(0, 10).map((r, i) => (
         <div
           key={r.id}
           style={{
@@ -2304,7 +2880,9 @@ function Leaderboard({ testId, showUser }) {
           <div>
             #{i + 1} {r.userId === showUser ? "(You)" : ""}
           </div>
-          <div style={{ opacity: 0.85 }}>{r.username || r.userId}</div>
+          <div style={{ opacity: 0.85 }}>
+            {r.username || r.mockTestTitle || r.userId}
+          </div>
           <div>
             {r.totalScore} / {r.totalMarks || r.totalQuestions}
           </div>
@@ -2329,8 +2907,8 @@ function Jobs() {
   const [sort, setSort] = useState("latest");
 
   useEffect(() => {
-    const q = query(collection(db, "jobs"), orderBy("createdAt", "desc"));
-    const unsub = onSnapshot(q, (snap) =>
+    const qy = query(collection(db, "jobs"), orderBy("createdAt", "desc"));
+    const unsub = onSnapshot(qy, (snap) =>
       setList(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
     return unsub;
@@ -2354,11 +2932,32 @@ function Jobs() {
         const bd = b.lastDate ? new Date(b.lastDate).getTime() : Infinity;
         return ad - bd;
       }
-      return 0;
+      return 0; // already latest from Firestore
     });
 
+  const jsonLd =
+    filtered.length > 0
+      ? {
+          "@context": "https://schema.org",
+          "@type": "ItemList",
+          itemListElement: filtered.slice(0, 50).map((j, i) => ({
+            "@type": "ListItem",
+            position: i + 1,
+            name: j.title,
+          })),
+        }
+      : null;
+
   return (
-    <Section title="Jobs">
+    <Section
+      title="Jobs"
+      seo={{
+        description:
+          "Latest government and exam-related jobs with apply links and last dates.",
+        canonicalPath: "/jobs",
+        jsonLd,
+      }}
+    >
       <div style={card}>
         <div
           style={{
@@ -2450,8 +3049,8 @@ function Notes() {
   const [preview, setPreview] = useState(null);
 
   useEffect(() => {
-    const q = query(collection(db, "notes"), orderBy("createdAt", "desc"));
-    const unsub = onSnapshot(q, (snap) =>
+    const qy = query(collection(db, "notes"), orderBy("createdAt", "desc"));
+    const unsub = onSnapshot(qy, (snap) =>
       setList(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
     return unsub;
@@ -2475,14 +3074,35 @@ function Notes() {
       await updateDoc(doc(db, "notes", note.id), {
         downloads: (note.downloads || 0) + 1,
       });
-    } catch (e) {
+    } catch {
       /* ignore */
     }
     window.open(note.fileUrl, "_blank", "noopener,noreferrer");
   };
 
+  const jsonLd =
+    filtered.length > 0
+      ? {
+          "@context": "https://schema.org",
+          "@type": "ItemList",
+          itemListElement: filtered.slice(0, 50).map((n, i) => ({
+            "@type": "ListItem",
+            position: i + 1,
+            name: n.title,
+          })),
+        }
+      : null;
+
   return (
-    <Section title="Study Notes">
+    <Section
+      title="Study Notes"
+      seo={{
+        description:
+          "Free exam notes and PDFs for SBI, Quant, Reasoning, and more. Preview and download.",
+        canonicalPath: "/notes",
+        jsonLd,
+      }}
+    >
       <div style={card}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <input
@@ -2555,6 +3175,7 @@ function Notes() {
             <iframe
               title="preview"
               src={preview.fileUrl}
+              loading="lazy"
               style={{ width: "100%", height: 560, border: 0, marginTop: 8 }}
             />
           ) : (
@@ -2578,12 +3199,12 @@ function Dashboard({ user }) {
       setAttempts([]);
       return;
     }
-    const q = query(
+    const qy = query(
       collection(db, "attempts"),
       where("userId", "==", user.uid),
       orderBy("submittedAt", "desc")
     );
-    const unsub = onSnapshot(q, (snap) =>
+    const unsub = onSnapshot(qy, (snap) =>
       setAttempts(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
     return unsub;
@@ -2592,7 +3213,10 @@ function Dashboard({ user }) {
   if (!user) return <Navigate to="/" replace />;
 
   return (
-    <Section title="My Dashboard">
+    <Section
+      title="My Dashboard"
+      seo={{ robots: "noindex,nofollow", canonicalPath: "/dashboard" }}
+    >
       <div style={card}>
         <h3 style={{ marginTop: 0 }}>Attempt History</h3>
         {attempts.length === 0 && <div>No attempts yet.</div>}
@@ -2606,7 +3230,7 @@ function Dashboard({ user }) {
             }}
           >
             <div>
-              Test: <code>{a.mockTestId}</code>
+              Test: <strong>{a.mockTestTitle || a.mockTestId}</strong>
             </div>
             <div>
               Score: <strong>{a.totalScore}</strong> /{" "}
@@ -2636,9 +3260,28 @@ function Dashboard({ user }) {
   HOME
   ============================ */
 function Home() {
+  const breadcrumbs = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "Home",
+        item: canonicalFor("/"),
+      },
+    ],
+  };
+
   return (
     <Section
       title="Crack Exams with Structured Mock Tests"
+      seo={{
+        description:
+          "Practice full-length and sectional mock tests. Timer, solutions, analytics, leaderboards — mobile friendly.",
+        canonicalPath: "/",
+        jsonLd: breadcrumbs,
+      }}
       actions={
         <Link to="/tests" style={btnGhost}>
           Browse Tests
@@ -2655,6 +3298,7 @@ function Home() {
           <li>
             Students can attempt tests, view solutions, and check leaderboards
           </li>
+          <li>Bulk import up to 100 questions per upload (CSV/JSON)</li>
         </ul>
       </div>
       <AdPlaceholder label="Homepage ad" />
@@ -2668,32 +3312,36 @@ function Home() {
 export default function App() {
   const { user, userDoc } = useAuthUser();
   return (
-    <Router>
-      <Navbar userDoc={userDoc} />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/tests" element={<TestsList />} />
-        <Route path="/tests/:id" element={<AttemptPage user={user} />} />
-        <Route
-          path="/tests/:testId/review/:attemptId"
-          element={<ReviewPage />}
-        />
-        <Route path="/jobs" element={<Jobs />} />
-        <Route path="/notes" element={<Notes />} />
-        <Route path="/dashboard" element={<Dashboard user={user} />} />
-        <Route path="/admin" element={<AdminPanel userDoc={userDoc} />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-      <footer
-        style={{
-          ...mobileWrap,
-          padding: 14,
-          opacity: 0.75,
-          textAlign: "center",
-        }}
-      >
-        © {new Date().getFullYear()} prepji
-      </footer>
-    </Router>
+    <HelmetProvider>
+      <Router>
+        <Navbar userDoc={userDoc} />
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/tests" element={<TestsList />} />
+          {/* Back-compat and SEO-friendly slug URL */}
+          <Route path="/tests/:id" element={<AttemptPage user={user} />} />
+          <Route path="/tests/:id/:slug" element={<AttemptPage user={user} />} />
+          <Route
+            path="/tests/:testId/review/:attemptId"
+            element={<ReviewPage />}
+          />
+          <Route path="/jobs" element={<Jobs />} />
+          <Route path="/notes" element={<Notes />} />
+          <Route path="/dashboard" element={<Dashboard user={user} />} />
+          <Route path="/admin" element={<AdminPanel userDoc={userDoc} />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+        <footer
+          style={{
+            ...mobileWrap,
+            padding: 14,
+            opacity: 0.75,
+            textAlign: "center",
+          }}
+        >
+          © {new Date().getFullYear()} prepji
+        </footer>
+      </Router>
+    </HelmetProvider>
   );
 }
