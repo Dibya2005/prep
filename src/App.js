@@ -27,7 +27,7 @@ import {
   doc,
   getDoc,
   setDoc,
-  updateDoc,          // <-- added so we can upgrade role if needed
+  updateDoc,
   onSnapshot,
   query,
   orderBy,
@@ -98,12 +98,8 @@ const labelSm = { fontSize: 12, color: "#64748b" };
 function Progress({ value }) {
   const v = Math.max(0, Math.min(100, Number(value) || 0));
   return (
-    <div
-      style={{ width: "100%", height: 8, background: "#e5e7eb", borderRadius: 999 }}
-    >
-      <div
-        style={{ width: `${v}%`, height: 8, background: "#0f172a", borderRadius: 999 }}
-      />
+    <div style={{ width: "100%", height: 8, background: "#e5e7eb", borderRadius: 999 }}>
+      <div style={{ width: `${v}%`, height: 8, background: "#0f172a", borderRadius: 999 }} />
     </div>
   );
 }
@@ -115,69 +111,24 @@ function Shell({ title, children, right }) {
   }, [title]);
   return (
     <>
-      <header
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 30,
-          background: "#fff",
-          borderBottom: "1px solid #e5e7eb",
-        }}
-      >
-        <div
-          style={{
-            ...wrap,
-            paddingTop: 10,
-            paddingBottom: 10,
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-          }}
-        >
-          <Link
-            to="/"
-            style={{ textDecoration: "none", color: "#0f172a", fontWeight: 700, fontSize: 18 }}
-          >
-            prepji
-          </Link>
+      <header style={{ position: "sticky", top: 0, zIndex: 30, background: "#fff", borderBottom: "1px solid #e5e7eb" }}>
+        <div style={{ ...wrap, paddingTop: 10, paddingBottom: 10, display: "flex", alignItems: "center", gap: 10 }}>
+          <Link to="/" style={{ textDecoration: "none", color: "#0f172a", fontWeight: 700, fontSize: 18 }}>prepji</Link>
           <nav style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-            <Link to="/quizzes" style={btnGhost}>
-              Quizzes
-            </Link>
-            <Link to="/dashboard" style={btnGhost}>
-              Dashboard
-            </Link>
-            <Link to="/admin" style={btnGhost}>
-              Admin
-            </Link>
+            <Link to="/quizzes" style={btnGhost}>Quizzes</Link>
+            <Link to="/dashboard" style={btnGhost}>Dashboard</Link>
+            <Link to="/admin" style={btnGhost}>Admin</Link>
             <AuthButtons />
           </nav>
         </div>
       </header>
 
-      <main
-        style={{
-          ...wrap,
-          display: "flex",
-          gap: 14,
-          alignItems: "flex-start",
-          flexWrap: "wrap",
-        }}
-      >
+      <main style={{ ...wrap, display: "flex", gap: 14, alignItems: "flex-start", flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 280 }}>{children}</div>
         {right && <aside style={{ width: 300, flexShrink: 0 }}>{right}</aside>}
       </main>
 
-      <footer
-        style={{
-          ...wrap,
-          textAlign: "center",
-          paddingTop: 16,
-          paddingBottom: 16,
-          color: "#6b7280",
-          fontSize: 14,
-        }}
-      >
+      <footer style={{ ...wrap, textAlign: "center", paddingTop: 16, paddingBottom: 16, color: "#6b7280", fontSize: 14 }}>
         © {new Date().getFullYear()} prepji
       </footer>
     </>
@@ -243,11 +194,12 @@ function useSession() {
   return state;
 }
 function SessionProvider({ children }) {
-  const value = useAuth();
+  // FIX: destructure and depend on scalars to satisfy exhaustive-deps
+  const { user, userDoc } = useAuth();
   useEffect(() => {
-    _session = value;
+    _session = { user, userDoc };
     listeners.forEach((l) => l(_session));
-  }, [value.user, value.userDoc]);
+  }, [user, userDoc]);
   return children;
 }
 
@@ -890,20 +842,9 @@ function TakeQuiz() {
       right={
         <div style={card}>
           <div style={{ fontWeight: 600 }}>Time</div>
-          <div
-            style={{
-              fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-              fontSize: 24,
-            }}
-          >
-            {mm}:{ss}
-          </div>
-          <div style={{ marginTop: 8 }}>
-            <Progress value={progressPct} />
-          </div>
-          <button style={{ ...btn, width: "100%", marginTop: 10 }} onClick={() => onSubmit(false)}>
-            Submit
-          </button>
+          <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 24 }}>{mm}:{ss}</div>
+          <div style={{ marginTop: 8 }}><Progress value={progressPct} /></div>
+          <button style={{ ...btn, width: "100%", marginTop: 10 }} onClick={() => onSubmit(false)}>Submit</button>
         </div>
       }
     >
@@ -927,18 +868,10 @@ function TakeQuiz() {
                   ...btnGhost,
                   textAlign: "left",
                   background: active ? "#f8fafc" : "#fff",
-                  borderColor: show
-                    ? ok
-                      ? "#16a34a"
-                      : wrong
-                      ? "#ef4444"
-                      : "#e5e7eb"
-                    : "#e5e7eb",
+                  borderColor: show ? (ok ? "#16a34a" : wrong ? "#ef4444" : "#e5e7eb") : "#e5e7eb",
                 }}
               >
-                <strong style={{ marginRight: 6 }}>
-                  {String.fromCharCode(65 + oi)}.
-                </strong>
+                <strong style={{ marginRight: 6 }}>{String.fromCharCode(65 + oi)}.</strong>
                 {op}
               </button>
             );
@@ -946,16 +879,8 @@ function TakeQuiz() {
         </div>
 
         <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-          <button style={btnGhost} onClick={prevQ} disabled={idx === 0}>
-            Prev
-          </button>
-          <button
-            style={btnGhost}
-            onClick={nextQ}
-            disabled={idx === order.length - 1}
-          >
-            Next
-          </button>
+          <button style={btnGhost} onClick={prevQ} disabled={idx === 0}>Prev</button>
+          <button style={btnGhost} onClick={nextQ} disabled={idx === order.length - 1}>Next</button>
         </div>
       </div>
     </Shell>
@@ -994,41 +919,19 @@ function QuizResult() {
     <Shell title="Result">
       <div style={{ ...card, textAlign: "center" }}>
         <div style={{ fontSize: 22, fontWeight: 700 }}>Your Score</div>
-        <div
-          style={{
-            fontSize: 36,
-            fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-            marginTop: 4,
-          }}
-        >
+        <div style={{ fontSize: 36, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", marginTop: 4 }}>
           {score} / {totalMarks}
         </div>
-        <div style={{ marginTop: 8 }}>
-          <Progress value={pct} />
-        </div>
+        <div style={{ marginTop: 8 }}><Progress value={pct} /></div>
         <div style={{ color: "#64748b", marginTop: 4 }}>{pct}%</div>
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            justifyContent: "center",
-            marginTop: 8,
-            fontSize: 14,
-          }}
-        >
+        <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 8, fontSize: 14 }}>
           <span>✅ Correct: {corr}</span>
           <span>❌ Wrong: {wr}</span>
           <span>⏭ Skipped: {sk}</span>
         </div>
-        <div
-          style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 12 }}
-        >
-          <Link to={`/quiz/${id}`} style={btnGhost}>
-            Retake
-          </Link>
-          <Link to="/quizzes" style={btn}>
-            Browse Quizzes
-          </Link>
+        <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 12 }}>
+          <Link to={`/quiz/${id}`} style={btnGhost}>Retake</Link>
+          <Link to="/quizzes" style={btn}>Browse Quizzes</Link>
         </div>
       </div>
     </Shell>
@@ -1042,14 +945,8 @@ function Dashboard() {
 
   useEffect(() => {
     if (!user) return;
-    const qy = query(
-      collection(db, "quiz_attempts"),
-      orderBy("createdAt", "desc"),
-      limit(50)
-    );
-    const unsub = onSnapshot(qy, (snap) =>
-      setAttempts(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
-    );
+    const qy = query(collection(db, "quiz_attempts"), orderBy("createdAt", "desc"), limit(50));
+    const unsub = onSnapshot(qy, (snap) => setAttempts(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
     return unsub;
   }, [user]);
 
@@ -1059,24 +956,12 @@ function Dashboard() {
     <Shell title="Dashboard">
       <div style={card}>
         <div style={{ fontWeight: 600, marginBottom: 8 }}>Recent Attempts</div>
-        {attempts.length === 0 && (
-          <div style={{ color: "#64748b", fontSize: 14 }}>No attempts yet.</div>
-        )}
+        {attempts.length === 0 && <div style={{ color: "#64748b", fontSize: 14 }}>No attempts yet.</div>}
         <div style={{ display: "grid", gap: 6 }}>
           {attempts.map((a) => (
-            <div
-              key={a.id}
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                borderTop: "1px dashed #e5e7eb",
-                paddingTop: 6,
-              }}
-            >
+            <div key={a.id} style={{ display: "flex", justifyContent: "space-between", borderTop: "1px dashed #e5e7eb", paddingTop: 6 }}>
               <div>Quiz: {a.quizId}</div>
-              <div>
-                {a.score} / {a.totalMarks ?? "—"}
-              </div>
+              <div>{a.score} / {a.totalMarks ?? "—"}</div>
             </div>
           ))}
         </div>
