@@ -240,6 +240,8 @@ const QuizEngine = {
       options: Array.isArray(q.options) ? q.options.slice(0, 4) : ["", "", "", ""],
       ans: Number(q.ans ?? 0),
       marks: Number(q.marks ?? 1) || 1,
+      // optional explanation support — shown if present
+      explain: typeof q.explain === "string" ? q.explain : "",
     }));
     const settings = {
       perQuestionSec: Number(raw?.settings?.perQuestionSec ?? 60) || 60,
@@ -274,7 +276,7 @@ const QuizEngine = {
       if (a == null) {
         sk++;
         return;
-      }
+        }
       if (a === q.ans) {
         score += q.marks;
         corr++;
@@ -308,6 +310,7 @@ function parseQuestionsJSON(text) {
         : [q.a, q.b, q.c, q.d].filter(Boolean),
       ans: q.ans != null ? Number(q.ans) : Number(q.answer),
       marks: q.marks != null ? Number(q.marks) : 1,
+      explain: typeof q.explain === "string" ? q.explain : "",
     };
     if (!item.q) throw new Error(`Item ${i + 1}: missing question text`);
     if (!item.options || item.options.length !== 4)
@@ -418,7 +421,7 @@ function CreateQuizCard() {
       ...s,
       questions: [
         ...s.questions,
-        { q: "", options: ["", "", "", ""], ans: 0, marks: 1 },
+        { q: "", options: ["", "", "", ""], ans: 0, marks: 1, explain: "" },
       ],
     }));
 
@@ -604,6 +607,7 @@ function CreateQuizCard() {
                     options: ["2", "3", "4", "5"],
                     ans: 2,
                     marks: 1,
+                    explain: "2 + 2 equals 4.",
                   },
                 ];
                 const blob = new Blob([JSON.stringify(sample, null, 2)], {
@@ -681,6 +685,19 @@ function CreateQuizCard() {
                     onChange={(e) => {
                       const c = JSON.parse(JSON.stringify(form));
                       c.questions[i].marks = Number(e.target.value) || 1;
+                      setForm(c);
+                    }}
+                  />
+                </label>
+                <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <span style={labelSm}>Explanation</span>
+                  <input
+                    style={input}
+                    placeholder="Optional explanation shown in Solutions"
+                    value={q.explain || ""}
+                    onChange={(e) => {
+                      const c = JSON.parse(JSON.stringify(form));
+                      c.questions[i].explain = e.target.value;
                       setForm(c);
                     }}
                   />
@@ -818,7 +835,7 @@ function TakeQuiz() {
 
   const onSubmit = async (auto = false) => {
     const res = QuizEngine.score(quiz, answers);
-    await addDoc(collection(db, "quiz_attempts"), {
+    const docRef = await addDoc(collection(db, "quiz_attempts"), {
       quizId: quiz.id,
       score: res.score,
       totalMarks: res.totalMarks,
@@ -826,11 +843,15 @@ function TakeQuiz() {
       wr: res.wr,
       sk: res.sk,
       settings: quiz.settings,
+      // NEW: persist answers & order so Solutions can display exactly what user did
+      answers,
+      order,
       auto,
       createdAt: serverTimestamp(),
     });
     localStorage.removeItem(QuizEngine.key(id));
-    navigate(`/quiz/${quiz.id}/result`, { state: { ...res } });
+    // pass attempt id via query param so we can show exact solutions
+    navigate(`/quiz/${quiz.id}/result?attempt=${docRef.id}`, { state: { ...res } });
   };
 
   const mm = String(Math.floor((secondsLeft || 0) / 60)).padStart(2, "0");
@@ -892,9 +913,23 @@ function QuizResult() {
   const { id } = useParams();
   const location = useLocation();
   const passed = (location && location.state) || {}; // {score,totalMarks,corr,wr,sk}
+  const attemptIdParam = new URLSearchParams(location.search).get("attempt");
 
   const [last, setLast] = useState(null);
+  const [lastId, setLastId] = useState(null);
+
   useEffect(() => {
+    // If we have a specific attempt, subscribe to it; else fetch latest
+    if (attemptIdParam) {
+      const ref = doc(db, "quiz_attempts", attemptIdParam);
+      const unsub = onSnapshot(ref, (snap) => {
+        if (snap.exists()) {
+          setLast(snap.data());
+          setLastId(snap.id);
+        }
+      });
+      return unsub;
+    }
     const qy = query(
       collection(db, "quiz_attempts"),
       where("quizId", "==", id),
@@ -902,11 +937,14 @@ function QuizResult() {
       limit(1)
     );
     const unsub = onSnapshot(qy, (snap) => {
-      const data = snap.docs[0]?.data();
-      if (data) setLast(data);
+      const d = snap.docs[0];
+      if (d) {
+        setLast(d.data());
+        setLastId(d.id);
+      }
     });
     return unsub;
-  }, [id]);
+  }, [id, attemptIdParam]);
 
   const score = passed.score ?? last?.score ?? 0;
   const totalMarks = passed.totalMarks ?? last?.totalMarks ?? 0;
@@ -914,6 +952,8 @@ function QuizResult() {
   const wr = passed.wr ?? last?.wr ?? 0;
   const sk = passed.sk ?? last?.sk ?? 0;
   const pct = totalMarks ? Math.round((score / totalMarks) * 100) : 0;
+
+  const currentAttemptId = attemptIdParam || lastId || "";
 
   return (
     <Shell title="Result">
@@ -931,8 +971,141 @@ function QuizResult() {
         </div>
         <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 12 }}>
           <Link to={`/quiz/${id}`} style={btnGhost}>Retake</Link>
+          {currentAttemptId && (
+            <Link to={`/quiz/${id}/solutions?attempt=${currentAttemptId}`} style={btnGhost}>
+              View Solutions
+            </Link>
+          )}
           <Link to="/quizzes" style={btn}>Browse Quizzes</Link>
         </div>
+      </div>
+    </Shell>
+  );
+}
+
+// NEW: Solutions Review Page
+function QuizSolutions() {
+  const { id } = useParams();
+  const location = useLocation();
+  const attemptIdParam = new URLSearchParams(location.search).get("attempt");
+
+  const [quiz, setQuiz] = useState(null);
+  const [attempt, setAttempt] = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      const snap = await getDoc(doc(db, "quizzes", id));
+      if (!snap.exists()) {
+        setQuiz({ missing: true });
+        return;
+      }
+      setQuiz(QuizEngine.normalize({ id: snap.id, ...snap.data() }));
+    })();
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    if (attemptIdParam) {
+      const ref = doc(db, "quiz_attempts", attemptIdParam);
+      return onSnapshot(ref, (snap) => {
+        if (snap.exists()) setAttempt({ id: snap.id, ...snap.data() });
+      });
+    }
+    // fallback: latest attempt for this quiz
+    const qy = query(
+      collection(db, "quiz_attempts"),
+      where("quizId", "==", id),
+      orderBy("createdAt", "desc"),
+      limit(1)
+    );
+    const unsub = onSnapshot(qy, (snap) => {
+      const d = snap.docs[0];
+      if (d) setAttempt({ id: d.id, ...d.data() });
+    });
+    return unsub;
+  }, [id, attemptIdParam]);
+
+  if (!quiz || !attempt) {
+    return (
+      <Shell title="Solutions">
+        <div style={card}>Loading…</div>
+      </Shell>
+    );
+  }
+  if (quiz.missing) {
+    return (
+      <Shell title="Solutions">
+        <div style={card}>Quiz not found.</div>
+      </Shell>
+    );
+  }
+
+  const answers = Array.isArray(attempt.answers) ? attempt.answers : [];
+  const order = Array.isArray(attempt.order)
+    ? attempt.order
+    : [...Array(quiz.questions.length).keys()];
+
+  return (
+    <Shell title="Solutions">
+      <div style={{ ...card, marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <div style={{ fontWeight: 700 }}>{quiz.title || "Quiz"}</div>
+          <div style={{ color: "#64748b", fontSize: 13 }}>Attempt: {attempt.id.slice(0, 8)}</div>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Link to={`/quiz/${id}/result?attempt=${attempt.id}`} style={btnGhost}>Back to Result</Link>
+          <Link to={`/quiz/${id}`} style={btn}>Retake</Link>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gap: 12 }}>
+        {order.map((qi, i) => {
+          const q = quiz.questions[qi];
+          const userPick = answers[qi];
+          const correct = q.ans;
+          const isCorrect = userPick === correct;
+          return (
+            <div key={qi} style={{ ...card }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                <div style={{ fontWeight: 600 }}>Q{i + 1}. {q.q}</div>
+                <div style={{ fontSize: 13, color: isCorrect ? "#16a34a" : "#ef4444" }}>
+                  {userPick == null ? "Skipped" : isCorrect ? "Correct" : "Incorrect"}
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+                {q.options.map((op, oi) => {
+                  const picked = userPick === oi;
+                  const ok = oi === correct;
+                  return (
+                    <div
+                      key={oi}
+                      style={{
+                        padding: "10px 12px",
+                        borderRadius: 10,
+                        border: "1px solid",
+                        borderColor: ok ? "#16a34a" : picked && !ok ? "#ef4444" : "#e5e7eb",
+                        background: picked ? "#f8fafc" : "#fff",
+                      }}
+                    >
+                      <strong style={{ marginRight: 6 }}>{String.fromCharCode(65 + oi)}.</strong>
+                      {op}
+                      {ok && <span style={{ marginLeft: 8, fontSize: 12, color: "#16a34a" }}>✓ Correct</span>}
+                      {picked && !ok && <span style={{ marginLeft: 8, fontSize: 12, color: "#ef4444" }}>Your answer</span>}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {q.explain && (
+                <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: "#f8fafc", border: "1px dashed #e5e7eb", color: "#334155" }}>
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>Explanation</div>
+                  {q.explain}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </Shell>
   );
@@ -962,6 +1135,7 @@ function Dashboard() {
             <div key={a.id} style={{ display: "flex", justifyContent: "space-between", borderTop: "1px dashed #e5e7eb", paddingTop: 6 }}>
               <div>Quiz: {a.quizId}</div>
               <div>{a.score} / {a.totalMarks ?? "—"}</div>
+              <Link to={`/quiz/${a.quizId}/solutions?attempt=${a.id}`} style={{ ...btnGhost, padding: "4px 8px" }}>Solutions</Link>
             </div>
           ))}
         </div>
@@ -1001,6 +1175,8 @@ export default function App() {
           <Route path="/quizzes" element={<Quizzes />} />
           <Route path="/quiz/:id" element={<TakeQuiz />} />
           <Route path="/quiz/:id/result" element={<QuizResult />} />
+          {/* NEW: solutions route */}
+          <Route path="/quiz/:id/solutions" element={<QuizSolutions />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/admin" element={<AdminPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
